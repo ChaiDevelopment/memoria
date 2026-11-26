@@ -1,0 +1,16 @@
+// Cloudflare Workers configuration for MEMORA (built with @opennextjs/cloudflare).
+// Secrets (SESSION_SECRET, GOOGLE_*, ALLOWED_EMAILS, DRIVE_FOLDER_ID, SHEET_ID)
+// are NOT stored here — set them with `npx wrangler secret put <NAME>`
+// or in the Cloudflare dashboard (Workers → memora → Settings → Variables).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "memora",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+}
