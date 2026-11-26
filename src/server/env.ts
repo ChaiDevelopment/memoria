@@ -35,7 +35,8 @@ const schema = z.object({
   GOOGLE_SERVICE_ACCOUNT_EMAIL: required.endsWith(".iam.gserviceaccount.com", "must be a service account email"),
   /** The service account's private key (PEM). Literal "\n" sequences are accepted. */
   GOOGLE_SERVICE_ACCOUNT_KEY: required
-    .transform((v) => v.replace(/\\n/g, "\n"))
+    // Accept the value pasted with or without its surrounding JSON quotes.
+    .transform((v) => v.replace(/^"|"$/g, "").replace(/\\n/g, "\n"))
     .refine((v) => v.includes("BEGIN PRIVATE KEY"), "must be the private_key value from the service account JSON"),
   /** The Drive folder whose photos make up the museum. */
   DRIVE_FOLDER_ID: required.regex(/^[A-Za-z0-9_-]{10,}$/, "must be a Drive folder id (from the folder URL)"),
