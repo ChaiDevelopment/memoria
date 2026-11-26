@@ -30,7 +30,8 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
   const root = useRef<THREE.Group>(null);
   const model = useRef<CharacterModelHandle>(null);
   const animator = useMemo(() => new CharacterAnimator(), []);
-  const tag = useMemo(() => createNameTag(peer.name), [peer.name]);
+  const label = peer.guest ? `${peer.name} · Guest` : peer.name;
+  const tag = useMemo(() => createNameTag(label), [label]);
   useEffect(() => () => (tag.material.map?.dispose(), tag.material.dispose()), [tag]);
 
   useFrame((_, rawDt) => {

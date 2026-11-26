@@ -20,7 +20,7 @@ import {
   TREE_TRUNK_RADIUS,
 } from "@/config/decorLayout";
 import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
-import { buildGrandLayout, type GrandLayout } from "@/config/grandMuseum";
+import { buildGrandLayout, GUESTBOOK_STAND, type GrandLayout } from "@/config/grandMuseum";
 import { AREAS, CEILINGS, FLOORS, WALLS } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import type { Interactable } from "@/systems/interaction/interactables";
@@ -199,6 +199,13 @@ export function buildWorld(wingFrames = 0, albumChapters = 0): WorldData {
       const [hx, hz] = n.x !== 0 ? [halfD, halfW] : [halfW, halfD];
       colliders.push(box({ minX: p.x - hx, maxX: p.x + hx, minZ: p.z - hz, maxZ: p.z + hz, minY: 0, maxY: 2.0 }, false));
     }
+  }
+
+  // The guest book stand in the Entrance Court.
+  {
+    const g = GUESTBOOK_STAND;
+    colliders.push(box({ minX: g.x - 0.25, maxX: g.x + 0.25, minZ: g.z - g.width / 2, maxZ: g.z + g.width / 2, minY: 0, maxY: g.height + 0.2 }, false));
+    interactables.push({ id: "guestbook", kind: "guestbook", memoryId: "guestbook", label: "Guest Book", x: g.x - 0.2, y: 1.4, z: g.z, normalX: -1, normalZ: 0 });
   }
 
   // Album Kata lecterns: an open book per chapter.

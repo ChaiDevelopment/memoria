@@ -52,7 +52,7 @@ export default {
 
     const stub = env.PRESENCE.get(env.PRESENCE.idFromName(claims.room));
     const headers = new Headers(request.headers);
-    headers.set("x-memora-user", JSON.stringify({ email: claims.email, name: claims.name }));
+    headers.set("x-memora-user", JSON.stringify({ email: claims.email, name: claims.name, guest: claims.guest === true }));
     return stub.fetch(new Request(request.url, { headers }));
   },
 } satisfies ExportedHandler<Env>;
@@ -65,7 +65,7 @@ export class MuseumPresence extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    let user: { email: string; name: string };
+    let user: { email: string; name: string; guest?: boolean };
     try {
       user = JSON.parse(request.headers.get("x-memora-user") ?? "");
     } catch {
@@ -82,7 +82,12 @@ export class MuseumPresence extends DurableObject<Env> {
       return new Response(null, { status: 101, webSocket: client });
     }
 
-    const peer: PeerInfo = { id: crypto.randomUUID().slice(0, 8), name: displayName(user.name, user.email), color: colorIndexFor(user.email) };
+    const peer: PeerInfo = {
+      id: crypto.randomUUID().slice(0, 8),
+      name: displayName(user.name, user.email),
+      color: colorIndexFor(user.email),
+      ...(user.guest ? { guest: true } : {}),
+    };
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ peer, s: null, last: 0 } satisfies Attachment);
 

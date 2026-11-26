@@ -25,6 +25,7 @@ export function GameHUD() {
 
 function BrandBlock() {
   const museumName = useGameStore((s) => s.museumName);
+  const viewer = useGameStore((s) => s.viewer);
   const currentArea = useGameStore((s) => s.currentArea);
   const area = areaInfo(currentArea);
   return (
@@ -37,6 +38,12 @@ function BrandBlock() {
           <div className="hidden max-w-[46vw] truncate font-display text-[12px] italic text-ivory/70 min-[440px]:block sm:text-[13px]">{museumName}</div>
         </div>
       </div>
+      {viewer?.role === "visitor" && (
+        <div className="hud-panel w-fit rounded-full px-3 py-1 text-[11px] tracking-wide text-ivory/80" title="You're visiting with the museum's keyword">
+          <span className="mr-1.5 rounded-full bg-gold px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-ink">Guest</span>
+          {viewer.name}
+        </div>
+      )}
       {area && (
         <div className="hud-panel w-fit rounded-full px-3 py-1 text-[11px] tracking-wide text-ivory/80">
           <span className="mr-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-gold align-middle" />
@@ -147,7 +154,8 @@ function BottomPrompts() {
   const exhibitTitle = useGameStore((s) => (s.nearby ? s.exhibits[s.nearby.memoryId]?.title : undefined));
   const albumTitle = useGameStore((s) => (s.nearby?.kind === "album" ? s.album[Number(s.nearby.memoryId.replace("album-", ""))]?.title : undefined));
   const albumOpen = useGameStore((s) => s.albumIndex !== null);
-  if (menuOpen || inspecting || albumOpen) return null;
+  const guestbookOpen = useGameStore((s) => s.guestbookOpen);
+  if (menuOpen || inspecting || albumOpen || guestbookOpen) return null;
 
   const prompt = nearby && (
     <div className="prompt-pop hud-panel flex max-w-[92vw] items-center gap-3 rounded-full py-2 pl-2 pr-5">
@@ -157,7 +165,11 @@ function BottomPrompts() {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
           )}
           <span className="min-w-0 truncate text-sm text-ivory">
-            {nearby.kind === "album" ? (
+            {nearby.kind === "guestbook" ? (
+              <>
+                Open the <span className="font-display italic text-gold">Guest Book</span>
+              </>
+            ) : nearby.kind === "album" ? (
               <>
                 Read <span className="font-display italic text-gold">“{albumTitle ?? "Album Kata"}”</span>
               </>

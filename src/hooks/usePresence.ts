@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { api, ApiClientError } from "@/lib/apiClient";
 import { PING_MESSAGE, parseServerMessage, stateChanged, type PeerState } from "@/shared/presence";
-import { gameStore } from "@/stores/gameStore";
+import { gameStore, useGameStore } from "@/stores/gameStore";
 import { getLocalRuntime, pushState, remotePeers, upsertPeer } from "@/systems/presence/remotePeers";
 
 const SEND_INTERVAL_MS = 200; // ≤ 5 updates/s, and only when something changed
@@ -22,6 +22,8 @@ function currentState(): PeerState | null {
  * without PRESENCE_URL, simply stay solo.
  */
 export function usePresence() {
+  // Reconnect when someone joins with the keyword (or leaves).
+  const accessVersion = useGameStore((st) => st.accessVersion);
   useEffect(() => {
     let socket: WebSocket | null = null;
     let stopped = false;
@@ -91,7 +93,7 @@ export function usePresence() {
         switch (msg.t) {
           case "welcome":
             remotePeers.clear();
-            for (const p of msg.peers) upsertPeer({ id: p.id, name: p.name, color: p.color }, p.s);
+            for (const p of msg.peers) upsertPeer({ id: p.id, name: p.name, color: p.color, ...(p.guest ? { guest: true } : {}) }, p.s);
             lastSent = null; // announce our position to everyone right away
             syncPeers();
             break;
@@ -129,5 +131,5 @@ export function usePresence() {
       socket?.close(1000, "leaving");
       gameStore.getState().setPresence("off", []);
     };
-  }, []);
+  }, [accessVersion]);
 }

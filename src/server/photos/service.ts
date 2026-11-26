@@ -1,6 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { ALBUM_TAB, parseAlbumRows, type AlbumChapter } from "../album";
+import { GUESTBOOK_HEADER, GUESTBOOK_TAB, parseGuestbook, type GuestbookEntry } from "../guestbook";
+import { parseSettings, SETTINGS_TAB, type WorldSettings } from "../worldAccess";
 import { env } from "../env";
 import { DriveClient, takenAtFor, type DriveFile } from "../google/drive";
 import { serviceAccountToken } from "../google/serviceAccount";
@@ -30,6 +32,31 @@ async function folderFiles(drive: DriveClient, folderId: string, force = false):
   const files = await drive.listFolderImages(folderId);
   folderCache = { folderId, at: Date.now(), files: new Map(files.map((f) => [f.id, f])) };
   return folderCache.files;
+}
+
+/** The museum's public settings (keyword, name, published), cached briefly. */
+const SETTINGS_CACHE_MS = 60_000;
+let settingsCache: { at: number; settings: WorldSettings | null } | null = null;
+
+export async function worldSettings(force = false): Promise<WorldSettings | null> {
+  if (!force && settingsCache && Date.now() - settingsCache.at < SETTINGS_CACHE_MS) return settingsCache.settings;
+  const { sheets } = await clients();
+  const settings = parseSettings(await sheets.readTab(SETTINGS_TAB));
+  settingsCache = { at: Date.now(), settings };
+  return settings;
+}
+
+export async function listGuestbook(): Promise<GuestbookEntry[]> {
+  const { sheets } = await clients();
+  return parseGuestbook(await sheets.readTab(GUESTBOOK_TAB));
+}
+
+export async function addGuestbookEntry(name: string, message: string, role: "owner" | "visitor"): Promise<void> {
+  const { sheets } = await clients();
+  await sheets.ensureNamedTab(GUESTBOOK_TAB, GUESTBOOK_HEADER);
+  // A leading quote keeps Sheets from ever treating visitor text as a formula.
+  const safe = (v: string) => (/^[=+\-@]/.test(v) ? `'${v}` : v);
+  await sheets.appendToTab(GUESTBOOK_TAB, [[new Date().toISOString(), safe(name), safe(message), role]]);
 }
 
 /** The Album Kata chapters from the Sheet's "Album" tab (empty when there is none). */

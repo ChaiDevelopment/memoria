@@ -9,6 +9,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { GameErrorBoundary } from "./ui/ErrorBoundary";
 import { GameHUD } from "./ui/GameHUD";
 import { AlbumBook } from "./ui/AlbumBook";
+import { GuestbookPanel } from "./ui/GuestbookPanel";
 import { InspectOverlay } from "./ui/InspectOverlay";
 import { LiftMenu } from "./ui/LiftMenu";
 import { MobileControls } from "./ui/MobileControls";
@@ -19,7 +20,7 @@ import { TitleScreen } from "./ui/TitleScreen";
 const GameCanvas = dynamic(() => import("./game/GameCanvas"), { ssr: false });
 
 /** Client-only game shell: 3D canvas + layered UI + input wiring. */
-export default function GameRoot() {
+export default function GameRoot({ initialKeyword }: { initialKeyword?: string }) {
   const surface = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
@@ -38,7 +39,8 @@ export default function GameRoot() {
         <LiftMenu />
         <AlbumBook />
         <SettingsMenu />
-        <TitleScreen ready={ready} />
+        <GuestbookPanel />
+        <TitleScreen ready={ready} initialKeyword={initialKeyword} />
       </GameErrorBoundary>
     </div>
   );

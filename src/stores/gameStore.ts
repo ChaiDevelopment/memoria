@@ -3,6 +3,14 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { CAMERA } from "@/config/gameConfig";
 import type { ExhibitPhoto } from "@/content/exhibits";
 
+/** A guest book message as served by /api/guestbook. */
+export interface GuestbookEntryView {
+  time: string;
+  name: string;
+  message: string;
+  guest: boolean;
+}
+
 /** An Album Kata chapter as served by /api/album. */
 export interface AlbumChapterView {
   period: string;
@@ -28,7 +36,14 @@ export interface GameState {
   /** Memory id currently being inspected, or null. */
   inspectingId: string | null;
   /** Interactable the player can currently use. */
-  nearby: { id: string; kind: "photo" | "lift" | "album"; memoryId: string; label: string } | null;
+  nearby: { id: string; kind: "photo" | "lift" | "album" | "guestbook"; memoryId: string; label: string } | null;
+  /** Who is visiting: an owner (Google sign-in) or a keyword visitor; null = nobody yet. */
+  viewer: { role: "owner" | "visitor"; name: string } | null;
+  viewerStatus: "loading" | "ready";
+  /** Bumped when the visitor joins / leaves, so photos and presence reload. */
+  accessVersion: number;
+  guestbook: GuestbookEntryView[];
+  guestbookOpen: boolean;
   /** Album Kata chapters (from the Sheet's "Album" tab). */
   album: AlbumChapterView[];
   /** Chapter being read, or null. */
@@ -66,6 +81,11 @@ export interface GameState {
   /** Use whatever is nearby: inspect a photo or call the lift. */
   interact: () => void;
   closeLiftMenu: () => void;
+  setViewer: (viewer: GameState["viewer"], museumName?: string) => void;
+  refreshAccess: () => void;
+  setGuestbook: (entries: GuestbookEntryView[]) => void;
+  openGuestbook: () => void;
+  closeGuestbook: () => void;
   setAlbum: (album: AlbumChapterView[]) => void;
   openAlbum: (index: number) => void;
   closeAlbum: () => void;
@@ -106,6 +126,11 @@ export const useGameStore = create<GameState>()(
       inspectingId: null,
       nearby: null,
       liftMenuOpen: false,
+      viewer: null,
+      viewerStatus: "loading",
+      accessVersion: 0,
+      guestbook: [],
+      guestbookOpen: false,
       album: [],
       albumIndex: null,
       pendingTeleport: null,
@@ -126,7 +151,7 @@ export const useGameStore = create<GameState>()(
       enterMuseum: () => set({ phase: "playing", menuOpen: false }),
       openMenu: () => {
         if (get().phase !== "playing") return;
-        set({ menuOpen: true, inspectingId: null, liftMenuOpen: false, albumIndex: null });
+        set({ menuOpen: true, inspectingId: null, liftMenuOpen: false, albumIndex: null, guestbookOpen: false });
       },
       closeMenu: () => set({ menuOpen: false }),
       openInspect: (memoryId) => {
@@ -142,6 +167,7 @@ export const useGameStore = create<GameState>()(
         const { nearby, menuOpen, phase } = get();
         if (!nearby || menuOpen || phase !== "playing") return;
         if (nearby.kind === "lift") set({ liftMenuOpen: true });
+        else if (nearby.kind === "guestbook") set({ guestbookOpen: true });
         else if (nearby.kind === "album") {
           const index = Number(nearby.memoryId.replace("album-", ""));
           if (get().album[index]) set({ albumIndex: index });
@@ -149,6 +175,11 @@ export const useGameStore = create<GameState>()(
         else set({ inspectingId: nearby.memoryId });
       },
       closeLiftMenu: () => set({ liftMenuOpen: false }),
+      setViewer: (viewer, museumName) => set({ viewer, viewerStatus: "ready", ...(museumName ? { museumName } : {}) }),
+      refreshAccess: () => set({ accessVersion: get().accessVersion + 1, viewerStatus: "loading" }),
+      setGuestbook: (guestbook) => set({ guestbook }),
+      openGuestbook: () => set({ guestbookOpen: true }),
+      closeGuestbook: () => set({ guestbookOpen: false }),
       setAlbum: (album) => set({ album }),
       openAlbum: (index) => set({ albumIndex: Math.max(0, Math.min(get().album.length - 1, index)) }),
       closeAlbum: () => set({ albumIndex: null }),
@@ -191,6 +222,6 @@ export const useGameStore = create<GameState>()(
 /** Convenience for non-React code (game loop, event handlers). */
 export const gameStore = useGameStore;
 
-export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex">): boolean {
-  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null;
+export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex" | "guestbookOpen">): boolean {
+  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null || s.guestbookOpen;
 }

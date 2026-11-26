@@ -133,3 +133,26 @@ npx wrangler deploy -c presence/wrangler.jsonc
 npx wrangler secret put SESSION_SECRET -c presence/wrangler.jsonc   # same value as the app
 # main app secret: PRESENCE_URL = wss://memora-presence.<subdomain>.workers.dev
 ```
+
+## Keyword access ("Join World")
+
+Anyone can visit the museum **read-only** with its keyword, without an account.
+
+* The landing page (`/`) offers **Join World** (name + keyword), **Owner sign in**
+  (Google, full access) and a demo tour. `/w/<keyword>` opens the Join form
+  pre-filled, for sharing.
+* The keyword, museum name and published flag live in the Sheet's
+  **Settings** tab (`Setting | Value`): `Keyword`, `Museum name`, `Published`.
+  Matching ignores case and spaces. Set `Published` to FALSE (or change the
+  keyword) to close the museum: every visitor pass stops working at once.
+* `POST /api/world/join {keyword, name}` checks the keyword and sets a signed
+  visitor pass cookie (`memora_visitor`, 3 days). Unknown, unpublished and
+  private worlds all answer `404 world_not_found`. Attempts are rate-limited
+  (best effort, per Worker instance). `POST /api/world/leave` ends the visit.
+* Read-only endpoints (`/api/photos`, photo images, `/api/album`,
+  `/api/guestbook`, `/api/presence/token`) accept an owner session **or** a
+  visitor pass. Editing (`PATCH /api/photos/:id`, `/photos`) stays owner-only.
+  The Drive folder stays private: images are streamed by the server.
+* Visitors appear in multiplayer with their chosen name and a "Guest" tag.
+* **Guest book:** a board in the Entrance Court. Messages go to the Sheet's
+  **Guestbook** tab (created on the first message) and can be removed there.

@@ -13,6 +13,7 @@ import { Garden, Trees } from "./environment/Garden";
 import { Outdoors } from "./environment/Outdoors";
 import { grandSigns } from "@/content/wayfinding";
 import { AlbumLecterns } from "./environment/AlbumLecterns";
+import { GuestbookBoard } from "./environment/GuestbookBoard";
 import { GrandAtrium } from "./environment/GrandAtrium";
 import { PhotoZones } from "./environment/PhotoZones";
 import { RooftopCafe } from "./environment/RooftopCafe";
@@ -58,6 +59,7 @@ export function MuseumWorld({ world, quality }: { world: WorldData; quality: Qua
       <PhotoZones world={world} atlasCell={quality === "low" ? 256 : 384} />
       <Signage extra={signs} />
       <AlbumLecterns lecterns={world.grand.lecterns} />
+      <GuestbookBoard />
       <Garden />
       <Trees includeOutdoor={quality !== "low"} />
       <Outdoors />

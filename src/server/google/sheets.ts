@@ -97,6 +97,25 @@ export class SheetsClient {
     return data.values ?? [];
   }
 
+  /** Creates `tab` with a header row if it doesn't exist yet. */
+  async ensureNamedTab(tab: string, header: readonly string[]): Promise<void> {
+    const meta = (await this.call("?fields=sheets.properties.title")) as { sheets?: { properties?: { title?: string } }[] };
+    if (meta.sheets?.some((s) => s.properties?.title === tab)) return;
+    await this.call(":batchUpdate", {
+      method: "POST",
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: tab, gridProperties: { frozenRowCount: 1 } } } }] }),
+    });
+    await this.call(`/values/${encodeURIComponent(`${tab}!A1`)}?valueInputOption=RAW`, { method: "PUT", body: JSON.stringify({ values: [header] }) });
+  }
+
+  /** Appends plain-text rows (RAW: never interpreted as formulas). */
+  async appendToTab(tab: string, rows: (string | number)[][]): Promise<void> {
+    await this.call(`/values/${encodeURIComponent(`${tab}!A:D`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      method: "POST",
+      body: JSON.stringify({ values: rows }),
+    });
+  }
+
   async appendRows(rows: NewMemoryRow[]): Promise<void> {
     if (rows.length === 0) return;
     await this.call(`/values/${encodeURIComponent(`${TAB}!A:G`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {

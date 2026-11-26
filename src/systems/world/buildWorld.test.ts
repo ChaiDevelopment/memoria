@@ -83,7 +83,7 @@ describe("museum world (small collection)", () => {
       timeline: [36, 7],
       garden: [-35, -20],
       atrium: [-6, 20],
-      entrance: [6, 44],
+      entrance: [-6, 44],
     };
     for (const id of [...AREAS.map((a) => a.id), "atrium", "entrance"] as AreaId[]) {
       const [x, z] = probes[id]!;

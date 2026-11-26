@@ -1,4 +1,4 @@
-import { requireUser } from "@/server/auth/session";
+import { requireViewer } from "@/server/auth/viewer";
 import { handler, json } from "@/server/http";
 import { listLibrary } from "@/server/photos/service";
 
@@ -7,7 +7,8 @@ import { listLibrary } from "@/server/photos/service";
  * years and stories from the Sheet. New Drive photos are added automatically.
  */
 export const GET = handler(async () => {
-  await requireUser();
+  // Owners and keyword visitors both see the museum (visitors read-only).
+  await requireViewer();
   const photos = await listLibrary();
   return json(
     {

@@ -124,6 +124,9 @@ export function balconyFrames(floor: number, count: number): PhotoPlacement[] {
   return out.slice(0, count).map((p, i) => ({ ...p, memoryId: `b${floor}-${i + 1}` }));
 }
 
+/** The guest book stand in the Entrance Court (readers stand on its -x side, by the path). */
+export const GUESTBOOK_STAND = { x: 6.2, z: 43.6, facing: "-x" as const, width: 1.8, height: 1.9 };
+
 /** Album Kata lecterns per balcony: one open book per chapter, along the walk from the lift. */
 export const LECTERNS_PER_FLOOR = 10;
 const LECTERN_SPOTS: { x: number; z: number; facing: "+x" | "-x" | "+z" | "-z" }[] = [

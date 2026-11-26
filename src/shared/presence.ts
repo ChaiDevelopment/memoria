@@ -36,6 +36,8 @@ export interface PeerState {
 export interface PeerInfo {
   id: string;
   name: string;
+  /** Joined with the museum keyword (not an owner). */
+  guest?: boolean;
   /** Index into SWEATER_COLORS. */
   color: number;
 }
@@ -55,6 +57,8 @@ export interface PresenceTokenClaims {
   name: string;
   room: string;
   exp: number;
+  /** A keyword visitor rather than an owner. */
+  guest?: boolean;
 }
 
 /** Friends' sweaters (the local player keeps the signature mustard). */

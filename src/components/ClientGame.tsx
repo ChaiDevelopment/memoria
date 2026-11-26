@@ -12,8 +12,9 @@ const GameRoot = dynamic(() => import("./GameRoot"), {
   loading: () => <BootScreen />,
 });
 
-export function ClientGame() {
-  return <GameRoot />;
+/** `initialKeyword` comes from a share link (/w/<keyword>): the Join form opens pre-filled. */
+export function ClientGame({ initialKeyword }: { initialKeyword?: string }) {
+  return <GameRoot initialKeyword={initialKeyword} />;
 }
 
 export function BootScreen() {

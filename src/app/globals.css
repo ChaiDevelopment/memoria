@@ -197,10 +197,45 @@ body {
 }
 
 .title-backdrop {
+  /* Dim the live museum behind the landing so the text always reads clearly. */
   background:
-    linear-gradient(180deg, rgba(20, 13, 8, 0.15) 0%, rgba(20, 13, 8, 0) 35%, rgba(20, 13, 8, 0.55) 100%),
-    radial-gradient(ellipse at center, rgba(20, 13, 8, 0) 40%, rgba(20, 13, 8, 0.45) 100%);
+    radial-gradient(ellipse 60% 55% at 50% 58%, rgba(20, 13, 8, 0.55) 0%, rgba(20, 13, 8, 0.25) 70%, rgba(20, 13, 8, 0) 100%),
+    linear-gradient(180deg, rgba(20, 13, 8, 0.25) 0%, rgba(20, 13, 8, 0.15) 35%, rgba(20, 13, 8, 0.6) 100%);
 }
+.title-backdrop p,
+.title-backdrop h1,
+.title-backdrop h2 {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
+}
+/* Landing: keyword / name inputs and the gentle step transition. */
+.join-input {
+  width: 100%;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(246, 236, 217, 0.18);
+  background: rgba(15, 10, 6, 0.35);
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  color: var(--color-ivory);
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.join-input::placeholder {
+  color: rgba(246, 236, 217, 0.4);
+}
+.join-input:focus {
+  border-color: var(--color-gold);
+  background: rgba(15, 10, 6, 0.5);
+}
+.step-in {
+  animation: step-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 .title-rise {
   animation: title-rise 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }

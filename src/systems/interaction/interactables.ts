@@ -12,7 +12,7 @@ const MAX_EYE_DELTA = 2.5;
 export interface Interactable {
   id: string;
   /** "photo": inspect a memory. "lift": open the lift's floor menu. "album": read an Album Kata chapter. */
-  kind: "photo" | "lift" | "album";
+  kind: "photo" | "lift" | "album" | "guestbook";
   /** Photo slot id (for lifts: "lift-<floor>"). */
   memoryId: string;
   label: string;
