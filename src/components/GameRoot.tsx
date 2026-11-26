@@ -5,9 +5,12 @@ import { useCallback, useRef, useState } from "react";
 import { useDesktopControls } from "@/hooks/useDesktopControls";
 import { useInputDevice } from "@/hooks/useInputDevice";
 import { useMuseumExhibits } from "@/hooks/useMuseumExhibits";
+import { usePresence } from "@/hooks/usePresence";
 import { GameErrorBoundary } from "./ui/ErrorBoundary";
 import { GameHUD } from "./ui/GameHUD";
+import { AlbumBook } from "./ui/AlbumBook";
 import { InspectOverlay } from "./ui/InspectOverlay";
+import { LiftMenu } from "./ui/LiftMenu";
 import { MobileControls } from "./ui/MobileControls";
 import { SettingsMenu } from "./ui/SettingsMenu";
 import { TitleScreen } from "./ui/TitleScreen";
@@ -23,6 +26,7 @@ export default function GameRoot() {
   useDesktopControls(surface);
   useInputDevice();
   useMuseumExhibits();
+  usePresence();
 
   return (
     <div ref={surface} id="memora-game" className="fixed inset-0 overflow-hidden bg-[#e6dccb] select-none" onContextMenu={(e) => e.preventDefault()}>
@@ -31,6 +35,8 @@ export default function GameRoot() {
         <MobileControls />
         <GameHUD />
         <InspectOverlay />
+        <LiftMenu />
+        <AlbumBook />
         <SettingsMenu />
         <TitleScreen ready={ready} />
       </GameErrorBoundary>

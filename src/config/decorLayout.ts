@@ -89,8 +89,11 @@ export interface HedgeDef {
 export const HEDGES: HedgeDef[] = [
   { minX: -42.6, maxX: -41.4, minZ: -28.6, maxZ: 18.6, height: 1.6 },
   { minX: -42.6, maxX: -12.2, minZ: -28.6, maxZ: -27.4, height: 1.6 },
-  { minX: -42.6, maxX: -8.6, minZ: 17.4, maxZ: 18.6, height: 1.6 },
-  { minX: -9.6, maxX: -8.6, minZ: 14.2, maxZ: 18.6, height: 1.6 },
+  { minX: -42.6, maxX: -12.2, minZ: 17.4, maxZ: 18.6, height: 1.6 },
+  // Entrance Court (south of the Grand Atrium's portico).
+  { minX: -12.6, maxX: -11.6, minZ: 38.2, maxZ: 50.6, height: 1.6 },
+  { minX: -12.6, maxX: 12.6, minZ: 49.4, maxZ: 50.6, height: 1.6 },
+  { minX: 11.6, maxX: 12.6, minZ: 42.2, maxZ: 50.6, height: 1.6 },
   { minX: -12.6, maxX: -11.6, minZ: -28.6, maxZ: -24.2, height: 1.6 },
 ];
 export const HEDGE_COLLIDER_HEIGHT = 2.6;
@@ -215,8 +218,7 @@ export function outdoorTreeScatter(): TreeDef[] {
     { minX: -45, maxX: -7, minZ: -31, maxZ: 21 }, // garden
     { minX: -15, maxX: 15, minZ: -28, maxZ: 16 }, // lobby + gallery
     { minX: 7, maxX: 45, minZ: -1, maxZ: 15 }, // timeline hall
-    { minX: -17, maxX: 17, minZ: 12, maxZ: 31 }, // entrance plaza
-    { minX: 39, maxX: 220, minZ: -3, maxZ: 17 }, // room for the Memory Rooms to grow east
+    { minX: -17, maxX: 96, minZ: 10, maxZ: 55 }, // Grand Atrium, Memory Halls, Entrance Court
   ];
   const blocked = (x: number, z: number) =>
     keepOut.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);

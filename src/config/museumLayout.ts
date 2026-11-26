@@ -26,7 +26,8 @@ export const LOBBY_HEIGHT = 7;
 export const GALLERY_HEIGHT = 6;
 export const TIMELINE_HEIGHT = 5;
 
-export const SPAWN = { x: 0, y: 0, z: 11, facing: Math.PI } as const;
+/** Visitors arrive in the Entrance Court, facing the Grand Atrium's portico. */
+export const SPAWN = { x: 0, y: 0, z: 46, facing: Math.PI } as const;
 
 export const AREAS: AreaDef[] = [
   {
@@ -72,23 +73,7 @@ export const WALLS: WallDef[] = [
     thickness: T,
     openings: [{ kind: "door", start: -2.5, end: 2.5, bottom: 0, top: 4.4 }],
   },
-  {
-    id: "lobby-south",
-    area: "lobby",
-    axis: "x",
-    at: 14,
-    from: -9 - H,
-    to: 9 + H,
-    height: LOBBY_HEIGHT,
-    thickness: T,
-    exterior: true,
-    openings: [
-      { kind: "window", start: -7.6, end: -3.8, bottom: 0.7, top: 5.6 },
-      // Glazed main entrance (closed in Phase 1).
-      { kind: "window", start: -2.2, end: 2.2, bottom: 0, top: 4.6 },
-      { kind: "window", start: 3.8, end: 7.6, bottom: 0.7, top: 5.6 },
-    ],
-  },
+  // The lobby's south wall is the Grand Atrium's north wall (config/grandMuseum.ts).
   {
     id: "lobby-west",
     area: "lobby",
@@ -211,11 +196,8 @@ export const WALLS: WallDef[] = [
   },
 ];
 
-/**
- * The Timeline Hall's end wall (with a window). When Memory Rooms exist it is
- * replaced by the first room's doorway wall (see config/memoryWing.ts).
- */
-export const TIMELINE_EAST_WALL: WallDef = {
+/** The Timeline Hall's end wall (with a window). */
+const TIMELINE_EAST_WALL: WallDef = {
     id: "timeline-east",
     area: "timeline",
     axis: "z",
@@ -227,6 +209,8 @@ export const TIMELINE_EAST_WALL: WallDef = {
     exterior: true,
     openings: [{ kind: "window", start: 5, end: 9, bottom: 0.6, top: 4.2 }],
   };
+
+WALLS.push(TIMELINE_EAST_WALL);
 
 export const CEILINGS: CeilingDef[] = [
   {
@@ -286,5 +270,9 @@ export const SIGNS: SignDef[] = [
   { id: "gallery-to-lobby", title: "Grand Lobby", x: 0, y: 4.75, z: -H - 0.03, facing: "-z", width: 2.8, height: 0.5, style: "plaque" },
   { id: "timeline-title", title: "Timeline Hall", subtitle: "Walk through the years", x: 40.77, y: 4.6, z: 7, facing: "-x", width: 3.4, height: 0.7, style: "hero" },
   { id: "garden-to-lobby", title: "Grand Lobby", x: -9 - H - 0.03, y: 4.0, z: 7, facing: "-x", width: 2.6, height: 0.5, style: "plaque" },
+  { id: "to-atrium", title: "Grand Atrium", x: 0, y: 4.85, z: 14 - H - 0.03, facing: "-z", width: 3.0, height: 0.5, style: "plaque" },
+  { id: "atrium-to-lobby", title: "Grand Lobby", x: 0, y: 4.85, z: 14 + H + 0.03, facing: "+z", width: 2.8, height: 0.5, style: "plaque" },
+  { id: "portico", title: "MEMORA", subtitle: "A Shared World of Memories", x: 0, y: 6.6, z: 38 + H + 0.03, facing: "+z", width: 6.4, height: 1.6, style: "hero" },
+  { id: "atrium-to-garden", title: "Memory Garden", x: -12 + H + 0.03, y: 3.9, z: 15.9, facing: "+x", width: 2.4, height: 0.45, style: "plaque" },
   { id: "garden-to-gallery", title: "Main Memory Gallery", x: -12 - H - 0.03, y: 3.8, z: -12, facing: "-x", width: 3.0, height: 0.5, style: "plaque" },
 ];

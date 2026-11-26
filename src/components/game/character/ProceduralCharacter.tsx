@@ -27,14 +27,15 @@ const PALETTE = {
   blush: "#e89a86",
 };
 
-function useCharacterAssets() {
+function useCharacterAssets(sweater: string) {
   const assets = useMemo(() => {
     const mat = (color: string, roughness = 0.8) => new THREE.MeshStandardMaterial({ color, roughness, flatShading: true });
     const materials = {
       skin: mat(PALETTE.skin, 0.7),
       hair: mat(PALETTE.hair, 0.9),
-      sweater: mat(PALETTE.sweater),
-      sweaterDark: mat(PALETTE.sweaterDark),
+      sweater: mat(sweater),
+      // Shoulders/cuffs: a slightly darker shade of the sweater.
+      sweaterDark: mat(sweater === PALETTE.sweater ? PALETTE.sweaterDark : `#${new THREE.Color(sweater).multiplyScalar(0.86).getHexString()}`),
       pants: mat(PALETTE.pants),
       shoes: mat(PALETTE.shoes, 0.6),
       scarf: mat(PALETTE.scarf),
@@ -67,7 +68,7 @@ function useCharacterAssets() {
       bag: new THREE.BoxGeometry(0.2, 0.16, 0.08),
     };
     return { materials, geometries };
-  }, []);
+  }, [sweater]);
   useEffect(
     () => () => {
       Object.values(assets.materials).forEach((m) => m.dispose());
@@ -78,8 +79,8 @@ function useCharacterAssets() {
   return assets;
 }
 
-export function ProceduralCharacter({ ref }: { ref?: Ref<CharacterModelHandle> }) {
-  const { materials: m, geometries: g } = useCharacterAssets();
+export function ProceduralCharacter({ ref, sweater = PALETTE.sweater }: { ref?: Ref<CharacterModelHandle>; sweater?: string }) {
+  const { materials: m, geometries: g } = useCharacterAssets(sweater);
   const joints = useRef<Partial<Record<JointName, THREE.Group>>>({});
   const bind = (name: JointName) => (el: THREE.Group | null) => {
     if (el) joints.current[name] = el;

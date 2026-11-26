@@ -174,8 +174,16 @@ export function createSignAtlas(signs: readonly SignDef[]): Atlas {
       ctx.fillStyle = "#f3e3c3";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = `500 ${h * 0.42}px Georgia, 'Times New Roman', serif`;
-      drawSpaced(ctx, s.title.toUpperCase(), w / 2, h * 0.53, h * 0.06);
+      if (s.subtitle) {
+        ctx.font = `500 ${h * 0.3}px Georgia, 'Times New Roman', serif`;
+        drawSpaced(ctx, s.title.toUpperCase(), w / 2, h * 0.4, h * 0.045);
+        ctx.fillStyle = "#d9b77e";
+        ctx.font = `italic ${h * 0.22}px Georgia, 'Times New Roman', serif`;
+        ctx.fillText(s.subtitle, w / 2, h * 0.71);
+      } else {
+        ctx.font = `500 ${h * 0.42}px Georgia, 'Times New Roman', serif`;
+        drawSpaced(ctx, s.title.toUpperCase(), w / 2, h * 0.53, h * 0.06);
+      }
     }
     ctx.restore();
     rects.set(s.id, { u0: 0, u1: w / width, v0: 1 - (y + h) / height, v1: 1 - y / height });

@@ -2,6 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
+import { floorAtHeight } from "@/config/grandMuseum";
 import { SPAWN } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import { gameStore, isGameplayBlocked } from "@/stores/gameStore";
@@ -53,12 +54,26 @@ export function PlayerController({ runtime, world }: { runtime: PlayerRuntime; w
     }
 
     const motor = runtime.motor;
+    // Lift ride: move the visitor to the chosen floor.
+    const tp = st.pendingTeleport ? st.consumeTeleport() : null;
+    if (tp) {
+      motor.position.x = tp.x;
+      motor.position.y = tp.y;
+      motor.position.z = tp.z;
+      motor.velocity.x = motor.velocity.y = motor.velocity.z = 0;
+      motor.facing = tp.facing;
+      runtime.groundY = tp.y;
+      runtime.camera.yaw = tp.facing + Math.PI;
+      runtime.camera.pivot.x = tp.x;
+      runtime.camera.pivot.y = tp.y + 1.5;
+      runtime.camera.pivot.z = tp.z;
+    }
     const events = stepMotor(motor, { moveX, moveZ, run: axes.run, jump, faceTowards }, dt, world.colliders);
 
     // Safety net: anything outside the playable envelope returns to the lobby.
     const p = motor.position;
     const b = world.bounds;
-    if (p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ) {
+    if (p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ || p.y < -5) {
       p.x = SPAWN.x;
       p.y = SPAWN.y;
       p.z = SPAWN.z;
@@ -66,6 +81,7 @@ export function PlayerController({ runtime, world }: { runtime: PlayerRuntime; w
     }
 
     runtime.wantsRun = axes.run;
+    if (motor.grounded) runtime.groundY = p.y;
     runtime.anim.landed = events.landed;
     runtime.anim.state = selectAnimationState({
       grounded: motor.grounded,
@@ -78,12 +94,13 @@ export function PlayerController({ runtime, world }: { runtime: PlayerRuntime; w
     areaTimer.current -= dt;
     if (areaTimer.current <= 0) {
       areaTimer.current = 0.2;
-      const area = areaAt(p.x, p.z, world.areas);
+      const area = areaAt(p.x, p.z, world.areas, p.y);
       if (area) st.setCurrentArea(area.id);
+      st.setCurrentFloor(floorAtHeight(runtime.groundY));
     }
     if (!st.inspectingId) {
-      const it = blocked ? null : findInteractable(p.x, p.z, motor.facing, world.interactables);
-      st.setNearby(it ? { id: it.id, memoryId: it.memoryId, label: it.label } : null);
+      const it = blocked ? null : findInteractable(p.x, p.z, motor.facing, world.interactables, undefined, p.y);
+      st.setNearby(it ? { id: it.id, kind: it.kind, memoryId: it.memoryId, label: it.label } : null);
     }
   }, -3);
 

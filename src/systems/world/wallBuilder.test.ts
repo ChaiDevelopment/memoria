@@ -95,7 +95,8 @@ describe("rectMinusHoles", () => {
 describe("buildCeiling", () => {
   it("collides over the full rectangle, including skylights", () => {
     const c = buildCeiling({ area: "lobby", rect: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, height: 5, thickness: 0.3, skylights: [{ minX: 3, maxX: 7, minZ: 3, maxZ: 7 }] });
-    expect(c.collider).toMatchObject({ minX: 0, maxX: 10, minY: 5, maxY: 5.3 });
+    expect(c.colliders).toHaveLength(1);
+    expect(c.colliders[0]).toMatchObject({ minX: 0, maxX: 10, minY: 5, maxY: 5.3 });
     expect(c.glass).toHaveLength(1);
     expect(c.slabs.length).toBeGreaterThan(1);
   });
@@ -111,5 +112,24 @@ describe("frame trim", () => {
     expect(pieces.trim.some((t) => t.minX < 4 && t.maxX > 4 && t.minY === 0)).toBe(true);
     // Collision gap is unchanged.
     expect(pieces.colliders.filter((c) => c.minX < 5 && c.maxX > 5 && c.minY < 1)).toHaveLength(0);
+  });
+});
+
+describe("multi-storey pieces", () => {
+  it("lifts a wall onto its storey with baseY", () => {
+    const w = buildWall({ id: "up", area: "lobby", axis: "x", at: 0, from: 0, to: 10, height: 6, thickness: 0.4, baseY: 6, openings: [{ kind: "door", start: 4, end: 6, bottom: 0, top: 3 }] });
+    for (const b of [...w.solids, ...w.colliders, ...w.trim]) expect(b.minY).toBeGreaterThanOrEqual(6 - 1e-9);
+    expect(Math.max(...w.colliders.map((c) => c.maxY))).toBeCloseTo(12);
+    // The doorway is walkable at floor 6: the lintel collider starts at 9.
+    const lintel = w.colliders.find((c) => c.minX === 4);
+    expect(lintel?.minY).toBeCloseTo(9);
+  });
+
+  it("open-hole slabs collide only where there is floor", () => {
+    const c = buildCeiling({ area: "lobby", rect: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, height: 5.6, thickness: 0.4, skylights: [{ minX: 3, maxX: 7, minZ: 3, maxZ: 7 }], openHoles: true });
+    expect(c.glass).toHaveLength(0);
+    expect(c.colliders.length).toBeGreaterThan(1);
+    const inHole = c.colliders.some((b) => b.minX < 5 && b.maxX > 5 && b.minZ < 5 && b.maxZ > 5);
+    expect(inHole).toBe(false);
   });
 });

@@ -56,11 +56,15 @@ export function useDesktopControls(surface: RefObject<HTMLElement | null>) {
         case "KeyE":
           if (e.repeat || st.phase !== "playing" || st.menuOpen) break;
           if (st.inspectingId) st.closeInspect();
-          else if (st.nearby) st.openInspect(st.nearby.memoryId);
+          else if (st.liftMenuOpen) st.closeLiftMenu();
+          else if (st.albumIndex !== null) st.closeAlbum();
+          else st.interact();
           break;
         case "Escape":
           if (performance.now() - lastUnlockAt < UNLOCK_ESC_GRACE_MS) break;
           if (st.inspectingId) st.closeInspect();
+          else if (st.liftMenuOpen) st.closeLiftMenu();
+          else if (st.albumIndex !== null) st.closeAlbum();
           else if (st.menuOpen) st.closeMenu();
           else if (st.phase === "playing") st.openMenu();
           break;
@@ -104,7 +108,8 @@ export function useDesktopControls(surface: RefObject<HTMLElement | null>) {
       lastUnlockAt = performance.now();
       resetInput();
       if (st.inspectingId) st.closeInspect();
-      else if (st.phase === "playing" && !st.menuOpen && !st.isTouch) st.openMenu();
+      // The lift menu releases the mouse on purpose (to click a floor).
+      else if (st.phase === "playing" && !st.menuOpen && !st.liftMenuOpen && st.albumIndex === null && !st.isTouch) st.openMenu();
     };
 
     window.addEventListener("keydown", onKeyDown);

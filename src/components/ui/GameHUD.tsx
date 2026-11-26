@@ -48,18 +48,23 @@ function BrandBlock() {
 }
 
 function TopRightControls() {
-  const visitorCount = useGameStore((s) => s.visitorCount);
+  const presence = useGameStore((s) => s.presence);
+  const peers = useGameStore((s) => s.peers);
   const openMenu = useGameStore((s) => s.openMenu);
   const showFps = useGameStore((s) => s.settings.showFps);
   const { isFullscreen, supported, toggle } = useFullscreen();
+  // A real count (you + everyone connected), shown only while multiplayer is live.
+  const names = ["You", ...peers.map((p) => p.name)].join(", ");
   return (
     <div className="absolute right-[max(14px,env(safe-area-inset-right))] top-[max(14px,env(safe-area-inset-top))] flex flex-col items-end gap-2">
       <div className="flex items-center gap-2">
-        <div className="hud-panel flex h-10 items-center gap-2 rounded-full px-3.5 text-ivory/85" title="Live visitors arrive with multiplayer in a later phase">
-          <VisitorsIcon size={18} className="text-gold" />
-          <span className="text-sm tabular-nums">{visitorCount}</span>
-          <span className="hidden text-xs text-ivory/60 sm:inline">visiting</span>
-        </div>
+        {presence === "online" && (
+          <div className="hud-panel flex h-10 items-center gap-2 rounded-full px-3.5 text-ivory/85" title={`In the museum now: ${names}`} aria-label={`${peers.length + 1} visiting: ${names}`}>
+            <VisitorsIcon size={18} className="text-gold" />
+            <span className="text-sm tabular-nums">{peers.length + 1}</span>
+            <span className="hidden text-xs text-ivory/60 sm:inline">visiting</span>
+          </div>
+        )}
         {supported && (
           <button type="button" onClick={toggle} className="hud-button pointer-events-auto" aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
             {isFullscreen ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
@@ -140,7 +145,9 @@ function BottomPrompts() {
   const showHints = useGameStore((s) => s.settings.showHints);
   const pointerLocked = useGameStore((s) => s.pointerLocked);
   const exhibitTitle = useGameStore((s) => (s.nearby ? s.exhibits[s.nearby.memoryId]?.title : undefined));
-  if (menuOpen || inspecting) return null;
+  const albumTitle = useGameStore((s) => (s.nearby?.kind === "album" ? s.album[Number(s.nearby.memoryId.replace("album-", ""))]?.title : undefined));
+  const albumOpen = useGameStore((s) => s.albumIndex !== null);
+  if (menuOpen || inspecting || albumOpen) return null;
 
   const prompt = nearby && (
     <div className="prompt-pop hud-panel flex max-w-[92vw] items-center gap-3 rounded-full py-2 pl-2 pr-5">
@@ -150,7 +157,19 @@ function BottomPrompts() {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
           )}
           <span className="min-w-0 truncate text-sm text-ivory">
-            Inspect <span className="font-display italic text-gold">“{exhibitTitle ?? nearby.label}”</span>
+            {nearby.kind === "album" ? (
+              <>
+                Read <span className="font-display italic text-gold">“{albumTitle ?? "Album Kata"}”</span>
+              </>
+            ) : nearby.kind === "lift" ? (
+              <>
+                Ride the <span className="font-display italic text-gold">lift</span>
+              </>
+            ) : (
+              <>
+                Inspect <span className="font-display italic text-gold">“{exhibitTitle ?? nearby.label}”</span>
+              </>
+            )}
           </span>
     </div>
   );

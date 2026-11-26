@@ -17,6 +17,8 @@ const SHADOW_MAP: Record<QualityLevel, number> = { low: 0, medium: 1024, high: 2
  */
 export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality: QualityLevel }) {
   const light = useRef<THREE.DirectionalLight>(null);
+  const atriumLight = useRef<THREE.PointLight>(null);
+  const hallLight = useRef<THREE.PointLight>(null);
   const target = useMemo(() => new THREE.Object3D(), []);
   const { gl, scene } = useThree();
   const mapSize = SHADOW_MAP[quality];
@@ -49,6 +51,19 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
     target.position.set(x, 0, z);
     target.updateMatrixWorld();
     l.position.set(x + dir.x * 70, dir.y * 70, z + dir.z * 70);
+    // Two warm lights that travel with the visitor: one over the atrium at
+    // their storey, one over the Memory Hall they're in (constant light count,
+    // so no shader recompiles).
+    const g = runtime.groundY;
+    atriumLight.current?.position.set(0, g + 4.6, 28);
+    const h = hallLight.current;
+    if (h) {
+      const inHalls = p.x > 12;
+      h.intensity = inHalls ? 16 : 0;
+      const hx = 22 + Math.round((p.x - 22) / 20) * 20;
+      const hz = p.z < 28 ? 21 : 35;
+      h.position.set(hx, g + 4.2, hz);
+    }
   });
 
   return (
@@ -79,6 +94,8 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
           <pointLight position={[0, 5.2, 7]} color="#ffd9a0" intensity={22} distance={18} decay={1.6} />
           <pointLight position={[0, 4.6, -12]} color="#ffe2b5" intensity={20} distance={18} decay={1.6} />
           <pointLight position={[25, 3.6, 7]} color="#ffd59a" intensity={16} distance={20} decay={1.6} />
+          <pointLight ref={atriumLight} position={[0, 4.6, 28]} color="#ffdcaa" intensity={22} distance={22} decay={1.5} />
+          <pointLight ref={hallLight} position={[22, 4.2, 21]} color="#ffd9a0" intensity={0} distance={18} decay={1.6} />
         </>
       )}
       <fog attach="fog" args={["#e6dccb", 55, 210]} />

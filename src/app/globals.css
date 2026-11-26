@@ -140,6 +140,24 @@ body {
   animation: panel-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+/* Lift ride: the screen dims while the car travels. */
+.lift-fade {
+  z-index: 5;
+  animation: lift-fade 900ms ease-in-out forwards;
+}
+.lift-arrive {
+  animation: lift-arrive 700ms ease-out forwards;
+}
+@keyframes lift-arrive {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+@keyframes lift-fade {
+  0% { opacity: 0; }
+  45% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

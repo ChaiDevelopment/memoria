@@ -86,7 +86,8 @@ export function ThirdPersonCamera({ runtime, world }: { runtime: PlayerRuntime; 
     );
     let allowed = Math.max(CAMERA.collisionMinDistance, hit - CAMERA.collisionPadding);
     if (d.y < -1e-3) {
-      allowed = Math.min(allowed, Math.max(CAMERA.collisionMinDistance, (pivot.y - 0.25) / -d.y));
+      // Never dip below the floor the player is standing on (any storey).
+      allowed = Math.min(allowed, Math.max(CAMERA.collisionMinDistance, (pivot.y - (runtime.groundY + 0.25)) / -d.y));
     }
     const wanted = Math.min(cam.targetDistance, allowed);
 

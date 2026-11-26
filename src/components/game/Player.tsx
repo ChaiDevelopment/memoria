@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CAMERA } from "@/config/gameConfig";
+import { damp } from "@/lib/math";
 import { CharacterAnimator } from "@/systems/animation/characterAnimator";
 import type { PlayerRuntime } from "@/systems/runtime";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
@@ -19,6 +20,8 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   const model = useRef<CharacterModelHandle>(null);
   const animator = useMemo(() => new CharacterAnimator(), []);
   const groundY = useRef(0);
+  /** Rendered feet height: eases over stair steps instead of popping (physics stays exact). */
+  const visualY = useRef<number | null>(null);
 
   // Soft contact shadow, used when real-time shadows are disabled (low quality).
   const blobMaterial = useMemo(() => {
@@ -56,7 +59,12 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
 
     const g = root.current;
     if (g) {
-      g.position.set(motor.position.x, motor.position.y, motor.position.z);
+      const target = motor.position.y;
+      const v = visualY.current;
+      // Smooth only small grounded height changes (stairs, ledges); jumps, falls
+      // and teleports stay exact.
+      visualY.current = v !== null && motor.grounded && Math.abs(target - v) < 0.5 ? v + (target - v) * damp(22, dt) : target;
+      g.position.set(motor.position.x, visualY.current, motor.position.z);
       g.rotation.y = motor.facing;
       // Hide the model when the camera is pushed right up against it.
       g.visible = runtime.camera.distance > CAMERA.hidePlayerDistance;

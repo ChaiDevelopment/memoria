@@ -74,11 +74,12 @@ function loadImage(url: string): Promise<HTMLImageElement> {
  * Loads the thumbnails of the visitor's photos assigned to frames.
  * Until they arrive (or if some fail) the placeholder paintings stay up.
  */
-function useExhibitImages(): ReadonlyMap<string, HTMLImageElement> | undefined {
+function useExhibitImages(slotIds: ReadonlySet<string>): ReadonlyMap<string, HTMLImageElement> | undefined {
   const exhibits = useGameStore((s) => s.exhibits);
   const [images, setImages] = useState<ReadonlyMap<string, HTMLImageElement>>();
   useEffect(() => {
-    const entries = Object.entries(exhibits);
+    // Only this zone's frames: the building can hold ~1,000 photos.
+    const entries = Object.entries(exhibits).filter(([slot]) => slotIds.has(slot));
     if (entries.length === 0) {
       setImages(undefined);
       return;
@@ -100,14 +101,15 @@ function useExhibitImages(): ReadonlyMap<string, HTMLImageElement> | undefined {
     return () => {
       cancelled = true;
     };
-  }, [exhibits]);
+  }, [exhibits, slotIds]);
   return images;
 }
 
 export function Photographs({ placements, atlasCell }: { placements: readonly PhotoPlacement[]; atlasCell: number }) {
   const mats = getMaterials();
   const exhibits = useGameStore((s) => s.exhibits);
-  const exhibitImages = useExhibitImages();
+  const slotIds = useMemo(() => new Set(placements.map((p) => p.memoryId)), [placements]);
+  const exhibitImages = useExhibitImages(slotIds);
   const slots = useMemo<AtlasSlot[]>(
     () =>
       placements.map((p) => {

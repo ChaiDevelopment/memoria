@@ -35,6 +35,14 @@ describe("interaction", () => {
     expect(findInteractable(0, 2, Math.PI, [photo])?.id).toBe("p");
   });
 
+  it("ignores photos on another floor", () => {
+    // Same spot, but the player stands 7.4 m higher (upper floor).
+    expect(findInteractable(0, 2, Math.PI, [photo], undefined, 7.4)).toBeNull();
+    // And a photo hung on the upper floor isn't reachable from below.
+    expect(findInteractable(0, 2, Math.PI, [{ ...photo, y: 9.4 }], undefined, 0)).toBeNull();
+    expect(findInteractable(0, 2, Math.PI, [{ ...photo, y: 9.4 }], undefined, 7.4)?.id).toBe("p");
+  });
+
   it("ignores photos behind the player, behind the wall, or out of range", () => {
     expect(findInteractable(0, 2, 0, [photo])).toBeNull();
     expect(findInteractable(0, -2, 0, [photo])).toBeNull();

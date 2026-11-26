@@ -1,0 +1,16 @@
+// MEMORA presence (multiplayer) Worker — separate from the main app so it can
+// be developed with plain `wrangler dev` (no Next.js build needed).
+// Secret required: SESSION_SECRET (same value as the main app).
+//   npx wrangler secret put SESSION_SECRET -c presence/wrangler.jsonc
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "memora-presence",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "durable_objects": {
+    "bindings": [{ "name": "PRESENCE", "class_name": "MuseumPresence" }]
+  },
+  // SQLite-backed Durable Objects are the kind available on the Workers Free plan.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MuseumPresence"] }],
+  "observability": { "enabled": true }
+}

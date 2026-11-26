@@ -89,6 +89,14 @@ export class SheetsClient {
     return (data.values ?? []).map((v, i) => valuesToRow(v, i + 2)).filter((r): r is MemoryRow => r !== null);
   }
 
+  /** Raw rows of another tab (A2:D), or [] when the tab doesn't exist. */
+  async readTab(tab: string): Promise<unknown[][]> {
+    const meta = (await this.call("?fields=sheets.properties.title")) as { sheets?: { properties?: { title?: string } }[] };
+    if (!meta.sheets?.some((s) => s.properties?.title === tab)) return [];
+    const data = (await this.call(`/values/${encodeURIComponent(`${tab}!A2:D`)}?valueRenderOption=FORMATTED_VALUE`)) as { values?: unknown[][] };
+    return data.values ?? [];
+  }
+
   async appendRows(rows: NewMemoryRow[]): Promise<void> {
     if (rows.length === 0) return;
     await this.call(`/values/${encodeURIComponent(`${TAB}!A:G`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {

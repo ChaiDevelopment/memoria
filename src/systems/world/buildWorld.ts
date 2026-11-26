@@ -20,13 +20,14 @@ import {
   TREE_TRUNK_RADIUS,
 } from "@/config/decorLayout";
 import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
-import { buildWingLayout } from "@/config/memoryWing";
-import { AREAS, CEILINGS, FLOORS, TIMELINE_EAST_WALL, WALLS } from "@/config/museumLayout";
+import { buildGrandLayout, type GrandLayout } from "@/config/grandMuseum";
+import { AREAS, CEILINGS, FLOORS, WALLS } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import type { Interactable } from "@/systems/interaction/interactables";
 import type { BenchDef } from "@/config/decorLayout";
 import type { PhotoPlacement } from "@/types/memory";
 import type { AreaDef, AreaId, Box3Data, BoxCollider, Collider, CylinderCollider, FloorDef } from "@/types/world";
+import { buildStairFlight } from "./stairBuilder";
 import { buildCeiling, buildWall } from "./wallBuilder";
 
 export interface AreaGeometry {
@@ -37,6 +38,13 @@ export interface AreaGeometry {
   ceilingTrim: Box3Data[];
 }
 
+/** Grand Atrium furniture that isn't wall/ceiling: stairs, landings, balustrades, lift. */
+export interface AtriumGeometry {
+  treads: Box3Data[];
+  platforms: Box3Data[];
+  railings: Box3Data[];
+}
+
 export interface WorldData {
   colliders: Collider[];
   /** Subset of colliders the third-person camera must stay in front of. */
@@ -45,14 +53,15 @@ export interface WorldData {
   interactables: Interactable[];
   areas: AreaDef[];
   floors: FloorDef[];
-  /** Every frame in the building (museum + Memory Rooms). */
+  /** Every frame in the building (museum + Memory Halls). */
   placements: PhotoPlacement[];
-  /** Benches in the Memory Rooms (the museum's own are in config/decorLayout). */
+  /** Extra benches (the museum's own are in config/decorLayout). */
   wingBenches: BenchDef[];
   /** Everything the player can legitimately reach. */
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
-  /** Number of Memory Rooms. */
-  wingRooms: number;
+  /** The Grand Atrium, its floors and Memory Halls. */
+  grand: GrandLayout;
+  atrium: AtriumGeometry;
 }
 
 const box = (b: Box3Data, blocksCamera: boolean): BoxCollider => ({ kind: "box", blocksCamera, ...b });
@@ -73,13 +82,14 @@ function emptyAreaGeometry(): AreaGeometry {
 
 /**
  * Builds the whole world. `wingFrames` = photos beyond the museum's own
- * frames; they get Memory Rooms (see config/memoryWing.ts).
+ * frames; they open Memory Halls (see config/grandMuseum.ts).
  */
-export function buildWorld(wingFrames = 0): WorldData {
-  const wing = buildWingLayout(wingFrames);
-  const areas = [...AREAS, ...wing.areas];
-  const walls = [...WALLS, ...(wing.rooms > 0 ? wing.walls : [TIMELINE_EAST_WALL])];
-  const placements = [...PHOTO_PLACEMENTS, ...wing.placements];
+export function buildWorld(wingFrames = 0, albumChapters = 0): WorldData {
+  const grand = buildGrandLayout(wingFrames, albumChapters);
+  // Grand areas first: the atrium overlaps the garden's old south-east corner.
+  const areas = [...grand.areas, ...AREAS];
+  const walls = [...WALLS, ...grand.walls];
+  const placements = [...PHOTO_PLACEMENTS, ...grand.placements];
   const colliders: Collider[] = [];
   const areaGeometry = Object.fromEntries(areas.map((a) => [a.id, emptyAreaGeometry()])) as Record<AreaId, AreaGeometry>;
 
@@ -98,17 +108,40 @@ export function buildWorld(wingFrames = 0): WorldData {
     for (const c of pieces.colliders) colliders.push(box(c, true));
   }
 
-  for (const ceiling of [...CEILINGS, ...wing.ceilings]) {
+  for (const ceiling of [...CEILINGS, ...grand.ceilings]) {
     const pieces = buildCeiling(ceiling);
     const geo = geoFor(ceiling.area);
     geo.ceilingSlabs.push(...pieces.slabs);
     geo.ceilingTrim.push(...pieces.trim);
     geo.glass.push(...pieces.glass);
-    colliders.push(box(pieces.collider, true));
+    for (const c of pieces.colliders) colliders.push(box(c, true));
+  }
+
+  // Grand Atrium: stairs, landing, balustrades and the lift shaft.
+  const atrium: AtriumGeometry = { treads: [], platforms: [...grand.platforms], railings: [...grand.railings] };
+  for (const flight of grand.stairs) {
+    const pieces = buildStairFlight(flight);
+    atrium.treads.push(...pieces.treads);
+    atrium.railings.push(...pieces.railings);
+  }
+  for (const t of atrium.treads) colliders.push(box(t, false));
+  for (const p of atrium.platforms) colliders.push(box(p, true));
+  for (const r of atrium.railings) colliders.push(box(r, false));
+  colliders.push(box(grand.liftShaft, true));
+
+  // Rooftop café: the dome, counter, tables, planters and loungers.
+  {
+    const r = grand.rooftop;
+    const y = r.y;
+    colliders.push(cylinder(r.dome.x, r.dome.z, r.dome.radius, y, y + 6.6));
+    colliders.push(box(r.counter, false));
+    for (const t of r.tables) colliders.push(cylinder(t.x, t.z, 0.95, y, y + 0.8));
+    for (const p of r.planters) colliders.push(cylinder(p.x, p.z, 0.45, y, y + 1.2));
+    for (const l of r.loungers) colliders.push(box({ minX: l.x - 0.4, maxX: l.x + 0.4, minZ: l.z - 0.95, maxZ: l.z + 0.95, minY: y, maxY: y + 0.5 }, false));
   }
 
   // Furniture & decor.
-  for (const b of [...BENCHES, ...wing.benches]) {
+  for (const b of BENCHES) {
     const halfL = b.length / 2;
     const halfD = BENCH_DEPTH / 2;
     const [hx, hz] = b.along === "x" ? [halfL, halfD] : [halfD, halfL];
@@ -168,28 +201,62 @@ export function buildWorld(wingFrames = 0): WorldData {
     }
   }
 
+  // Album Kata lecterns: an open book per chapter.
+  for (const l of grand.lecterns) {
+    const n = facingToNormal(l.facing);
+    const [hx, hz] = n.x !== 0 ? [0.27, 0.4] : [0.4, 0.27];
+    colliders.push(box({ minX: l.x - hx, maxX: l.x + hx, minZ: l.z - hz, maxZ: l.z + hz, minY: l.y, maxY: l.y + 1.15 }, false));
+    interactables.push({
+      id: `album:${l.index}`,
+      kind: "album",
+      memoryId: `album-${l.index}`,
+      label: "Album Kata",
+      x: l.x,
+      y: l.y + 1.1,
+      z: l.z,
+      normalX: n.x,
+      normalZ: n.z,
+    });
+  }
+
+  for (const stop of grand.liftStops) {
+    interactables.push({
+      id: `lift:${stop.floor}`,
+      kind: "lift",
+      memoryId: `lift-${stop.floor}`,
+      label: "Call the lift",
+      x: stop.panel.x,
+      y: stop.panel.y,
+      z: stop.panel.z,
+      normalX: 0,
+      normalZ: -1,
+    });
+  }
+
   return {
     colliders,
     cameraColliders: colliders.filter((c) => c.blocksCamera),
     areaGeometry,
     interactables,
     areas,
-    floors: [...FLOORS, ...wing.floors],
+    floors: [...FLOORS, ...grand.floors],
     placements,
-    wingBenches: wing.benches,
-    bounds: { minX: -43, maxX: Math.max(42, wing.maxX + 1), minZ: -29, maxZ: 19 },
-    wingRooms: wing.rooms,
+    wingBenches: [],
+    bounds: { minX: -43, maxX: Math.max(42, grand.maxX + 1), minZ: -29, maxZ: 51 },
+    grand,
+    atrium,
   };
 }
 
-const cache = new Map<number, WorldData>();
+const cache = new Map<string, WorldData>();
 
-/** Worlds are immutable; one per wing size is built on demand and reused. */
-export function getWorld(wingFrames = 0): WorldData {
-  let world = cache.get(wingFrames);
+/** Worlds are immutable; one per (collection size, album length) is built on demand and reused. */
+export function getWorld(wingFrames = 0, albumChapters = 0): WorldData {
+  const key = `${wingFrames}:${albumChapters}`;
+  let world = cache.get(key);
   if (!world) {
-    world = buildWorld(wingFrames);
-    cache.set(wingFrames, world);
+    world = buildWorld(wingFrames, albumChapters);
+    cache.set(key, world);
   }
   return world;
 }

@@ -16,7 +16,8 @@ export interface CeilingPieces {
   slabs: Box3Data[];
   glass: Box3Data[];
   trim: Box3Data[];
-  collider: Box3Data;
+  /** Full slab, or only the solid pieces when the holes are open (openHoles). */
+  colliders: Box3Data[];
 }
 
 const BASEBOARD_HEIGHT = 0.16;
@@ -29,9 +30,10 @@ const REVEAL = 0.02;
 /** Box spanning [a0, a1] along the wall's run axis and [y0, y1] vertically. */
 function wallBox(w: WallDef, a0: number, a1: number, y0: number, y1: number, thickness = w.thickness): Box3Data {
   const half = thickness / 2;
+  const b = w.baseY ?? 0; // walls on upper floors stand on their storey
   return w.axis === "x"
-    ? { minX: a0, maxX: a1, minY: y0, maxY: y1, minZ: w.at - half, maxZ: w.at + half }
-    : { minX: w.at - half, maxX: w.at + half, minY: y0, maxY: y1, minZ: a0, maxZ: a1 };
+    ? { minX: a0, maxX: a1, minY: y0 + b, maxY: y1 + b, minZ: w.at - half, maxZ: w.at + half }
+    : { minX: w.at - half, maxX: w.at + half, minY: y0 + b, maxY: y1 + b, minZ: a0, maxZ: a1 };
 }
 
 export function validateWall(w: WallDef): string[] {
@@ -160,7 +162,7 @@ export function buildCeiling(c: CeilingDef): CeilingPieces {
     // Glazing bars across the long axis.
     const alongX = s.maxX - s.minX >= s.maxZ - s.minZ;
     const span = alongX ? s.maxX - s.minX : s.maxZ - s.minZ;
-    const bars = Math.max(0, Math.round(span / 1.5) - 1);
+    const bars = c.glazingBars === false ? 0 : Math.max(0, Math.round(span / 1.5) - 1);
     for (let i = 1; i <= bars; i++) {
       const t = i / (bars + 1);
       if (alongX) {
@@ -172,5 +174,6 @@ export function buildCeiling(c: CeilingDef): CeilingPieces {
       }
     }
   }
-  return { slabs, glass, trim, collider: { ...c.rect, minY: y0, maxY: y1 } };
+  const colliders = c.openHoles ? slabs.map((r) => ({ ...r })) : [{ ...c.rect, minY: y0, maxY: y1 }];
+  return { slabs, glass: c.openHoles ? [] : glass, trim, colliders };
 }

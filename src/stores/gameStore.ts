@@ -2,6 +2,15 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { CAMERA } from "@/config/gameConfig";
 import type { ExhibitPhoto } from "@/content/exhibits";
+
+/** An Album Kata chapter as served by /api/album. */
+export interface AlbumChapterView {
+  period: string;
+  title: string;
+  words: string;
+  photos: { id: string; thumbUrl: string; url: string }[];
+}
+import type { PeerInfo } from "@/shared/presence";
 import type { GameSettings, QualityLevel } from "@/types/game";
 import type { AreaId } from "@/types/world";
 
@@ -19,12 +28,25 @@ export interface GameState {
   /** Memory id currently being inspected, or null. */
   inspectingId: string | null;
   /** Interactable the player can currently use. */
-  nearby: { id: string; memoryId: string; label: string } | null;
+  nearby: { id: string; kind: "photo" | "lift" | "album"; memoryId: string; label: string } | null;
+  /** Album Kata chapters (from the Sheet's "Album" tab). */
+  album: AlbumChapterView[];
+  /** Chapter being read, or null. */
+  albumIndex: number | null;
+  /** The lift's floor menu is open. */
+  liftMenuOpen: boolean;
+  /** A requested move (lift ride) for the player controller to apply on its next frame. */
+  pendingTeleport: { x: number; y: number; z: number; facing: number } | null;
+  /** Storey the player is on (0 = ground). */
+  currentFloor: number;
+  /** Increments on every lift ride (drives the arrival fade). */
+  rides: number;
   currentArea: AreaId | null;
   isTouch: boolean;
   pointerLocked: boolean;
-  /** Placeholder until multiplayer arrives in a later phase. */
-  visitorCount: number;
+  /** Multiplayer connection state and the other visitors currently in the museum. */
+  presence: "off" | "connecting" | "online";
+  peers: PeerInfo[];
   museumName: string;
   settings: GameSettings;
   /** Developer aid: render collision volumes (not persisted). */
@@ -32,7 +54,7 @@ export interface GameState {
   /** The signed-in user's photos hung in the museum: frame slot id → photo. */
   exhibits: Record<string, ExhibitPhoto>;
   exhibitsStatus: "loading" | "signed-out" | "ready" | "error";
-  /** Photos beyond the museum's own frames — they open Memory Rooms. */
+  /** Photos beyond the museum's own frames — they open Memory Halls. */
   wingFrames: number;
 
   enterMuseum: () => void;
@@ -41,6 +63,15 @@ export interface GameState {
   openInspect: (memoryId: string) => void;
   closeInspect: () => void;
   setNearby: (nearby: GameState["nearby"]) => void;
+  /** Use whatever is nearby: inspect a photo or call the lift. */
+  interact: () => void;
+  closeLiftMenu: () => void;
+  setAlbum: (album: AlbumChapterView[]) => void;
+  openAlbum: (index: number) => void;
+  closeAlbum: () => void;
+  requestTeleport: (to: NonNullable<GameState["pendingTeleport"]>) => void;
+  consumeTeleport: () => GameState["pendingTeleport"];
+  setCurrentFloor: (floor: number) => void;
   setCurrentArea: (area: AreaId | null) => void;
   setIsTouch: (isTouch: boolean) => void;
   setPointerLocked: (locked: boolean) => void;
@@ -48,6 +79,7 @@ export interface GameState {
   resetSettings: () => void;
   setDebugColliders: (on: boolean) => void;
   setExhibits: (status: GameState["exhibitsStatus"], exhibits?: Record<string, ExhibitPhoto>, wingFrames?: number) => void;
+  setPresence: (presence: GameState["presence"], peers?: PeerInfo[]) => void;
 }
 
 function defaultQuality(): QualityLevel {
@@ -73,10 +105,17 @@ export const useGameStore = create<GameState>()(
       menuOpen: false,
       inspectingId: null,
       nearby: null,
+      liftMenuOpen: false,
+      album: [],
+      albumIndex: null,
+      pendingTeleport: null,
+      currentFloor: 0,
+      rides: 0,
       currentArea: null,
       isTouch: false,
       pointerLocked: false,
-      visitorCount: 1,
+      presence: "off",
+      peers: [],
       museumName: "The Museum of Small Moments",
       settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() },
       debugColliders: false,
@@ -87,7 +126,7 @@ export const useGameStore = create<GameState>()(
       enterMuseum: () => set({ phase: "playing", menuOpen: false }),
       openMenu: () => {
         if (get().phase !== "playing") return;
-        set({ menuOpen: true, inspectingId: null });
+        set({ menuOpen: true, inspectingId: null, liftMenuOpen: false, albumIndex: null });
       },
       closeMenu: () => set({ menuOpen: false }),
       openInspect: (memoryId) => {
@@ -99,6 +138,29 @@ export const useGameStore = create<GameState>()(
         if (get().nearby?.id === nearby?.id) return;
         set({ nearby });
       },
+      interact: () => {
+        const { nearby, menuOpen, phase } = get();
+        if (!nearby || menuOpen || phase !== "playing") return;
+        if (nearby.kind === "lift") set({ liftMenuOpen: true });
+        else if (nearby.kind === "album") {
+          const index = Number(nearby.memoryId.replace("album-", ""));
+          if (get().album[index]) set({ albumIndex: index });
+        }
+        else set({ inspectingId: nearby.memoryId });
+      },
+      closeLiftMenu: () => set({ liftMenuOpen: false }),
+      setAlbum: (album) => set({ album }),
+      openAlbum: (index) => set({ albumIndex: Math.max(0, Math.min(get().album.length - 1, index)) }),
+      closeAlbum: () => set({ albumIndex: null }),
+      requestTeleport: (pendingTeleport) => set({ pendingTeleport, liftMenuOpen: false, rides: get().rides + 1 }),
+      consumeTeleport: () => {
+        const t = get().pendingTeleport;
+        if (t) set({ pendingTeleport: null });
+        return t;
+      },
+      setCurrentFloor: (currentFloor) => {
+        if (get().currentFloor !== currentFloor) set({ currentFloor });
+      },
       setCurrentArea: (currentArea) => {
         if (get().currentArea !== currentArea) set({ currentArea });
       },
@@ -109,6 +171,7 @@ export const useGameStore = create<GameState>()(
       updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
       resetSettings: () => set({ settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() } }),
       setDebugColliders: (debugColliders) => set({ debugColliders }),
+      setPresence: (presence, peers) => set(peers ? { presence, peers } : { presence }),
       setExhibits: (exhibitsStatus, exhibits, wingFrames) =>
         set({ exhibitsStatus, ...(exhibits ? { exhibits } : {}), ...(wingFrames !== undefined ? { wingFrames } : {}) }),
     }),
@@ -128,6 +191,6 @@ export const useGameStore = create<GameState>()(
 /** Convenience for non-React code (game loop, event handlers). */
 export const gameStore = useGameStore;
 
-export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId">): boolean {
-  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null;
+export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex">): boolean {
+  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null;
 }

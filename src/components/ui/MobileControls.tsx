@@ -155,7 +155,7 @@ function Joystick() {
 
 function ActionButtons() {
   const nearby = useGameStore((s) => s.nearby);
-  const openInspect = useGameStore((s) => s.openInspect);
+  const interact = useGameStore((s) => s.interact);
   const [running, setRunning] = useState(input.runToggle);
 
   const press = (e: ReactPointerEvent<HTMLButtonElement>, action: () => void) => {
@@ -175,7 +175,7 @@ function ActionButtons() {
         aria-disabled={!nearby}
         data-testid="btn-interact"
         className={`touch-button col-start-1 row-start-1 h-16 w-16 ${nearby ? "touch-button-highlight" : "opacity-45"}`}
-        onPointerDown={(e) => press(e, () => nearby && openInspect(nearby.memoryId))}
+        onPointerDown={(e) => press(e, interact)}
       >
         <HandIcon size={26} />
       </button>

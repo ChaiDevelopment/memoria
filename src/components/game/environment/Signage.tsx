@@ -2,18 +2,19 @@
 
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { SIGNS } from "@/config/museumLayout";
+import { SIGNS, type SignDef } from "@/config/museumLayout";
 import { texturedQuadsGeometry, type TexturedQuad } from "@/lib/geometry";
 import { facingToNormal, facingToRotationY } from "@/lib/math";
 import { createSignAtlas } from "@/lib/textures/proceduralTextures";
 
 /** Wayfinding signs above doorways and the MEMORA hero lettering. One draw call per style. */
-export function Signage() {
-  const atlas = useMemo(() => createSignAtlas(SIGNS), []);
+export function Signage({ extra = [] }: { extra?: readonly SignDef[] }) {
+  const all = useMemo(() => [...SIGNS, ...extra], [extra]);
+  const atlas = useMemo(() => createSignAtlas(all), [all]);
   const { hero, plaques } = useMemo(() => {
     const heroQuads: TexturedQuad[] = [];
     const plaqueQuads: TexturedQuad[] = [];
-    for (const s of SIGNS) {
+    for (const s of all) {
       const uv = atlas.rects.get(s.id);
       if (!uv) throw new Error(`Missing sign ${s.id}`);
       const n = facingToNormal(s.facing);
@@ -29,7 +30,7 @@ export function Signage() {
       (s.style === "hero" ? heroQuads : plaqueQuads).push(quad);
     }
     return { hero: texturedQuadsGeometry(heroQuads), plaques: texturedQuadsGeometry(plaqueQuads) };
-  }, [atlas]);
+  }, [atlas, all]);
 
   const materials = useMemo(
     () => ({

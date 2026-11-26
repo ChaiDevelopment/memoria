@@ -11,6 +11,7 @@ interface MuseumRoomProps {
   world: WorldData;
   area: AreaId;
   floorMaterial: THREE.Material;
+  visible?: boolean;
 }
 
 /**
@@ -18,7 +19,7 @@ interface MuseumRoomProps {
  * pieces are generated from the layout data and merged per material, so a
  * room costs ~5 draw calls and is frustum-culled as a unit.
  */
-export function MuseumRoom({ world, area, floorMaterial }: MuseumRoomProps) {
+export function MuseumRoom({ world, area, floorMaterial, visible = true }: MuseumRoomProps) {
   const mats = getMaterials();
   const geometry = useMemo(() => {
     const geo = world.areaGeometry[area];
@@ -28,7 +29,7 @@ export function MuseumRoom({ world, area, floorMaterial }: MuseumRoomProps) {
       ceiling: mergeBoxes(geo?.ceilingSlabs ?? []),
       glass: mergeBoxes(geo?.glass ?? []),
       floor: floorGeometry(
-        world.floors.filter((f) => f.area === area).map((f) => f.rect),
+        world.floors.filter((f) => f.area === area).map((f) => ({ ...f.rect, y: f.y })),
         0.02,
         4,
       ),
@@ -43,7 +44,7 @@ export function MuseumRoom({ world, area, floorMaterial }: MuseumRoomProps) {
   );
 
   return (
-    <group name={`room-${area}`}>
+    <group name={`room-${area}`} visible={visible}>
       {geometry.walls && <mesh geometry={geometry.walls} material={mats.wall} castShadow receiveShadow />}
       {geometry.trim && <mesh geometry={geometry.trim} material={mats.trim} castShadow receiveShadow />}
       {geometry.ceiling && <mesh geometry={geometry.ceiling} material={mats.ceiling} castShadow receiveShadow />}

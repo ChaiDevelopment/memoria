@@ -24,6 +24,8 @@ export interface PlayerRuntime {
     landed: boolean;
   };
   wantsRun: boolean;
+  /** Height of the floor the player last stood on (for the camera's floor clamp). */
+  groundY: number;
 }
 
 export function createPlayerRuntime(): PlayerRuntime {
@@ -39,5 +41,6 @@ export function createPlayerRuntime(): PlayerRuntime {
     },
     anim: { state: "idle", landed: false },
     wantsRun: false,
+    groundY: SPAWN.y,
   };
 }

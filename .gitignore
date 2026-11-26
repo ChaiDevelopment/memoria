@@ -16,3 +16,6 @@ next-env.d.ts
 .open-next/
 .wrangler/
 .dev.vars
+
+# Presence worker local secrets
+presence/.dev.vars

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { ALBUM_TAB, parseAlbumRows, type AlbumChapter } from "../album";
 import { env } from "../env";
 import { DriveClient, takenAtFor, type DriveFile } from "../google/drive";
 import { serviceAccountToken } from "../google/serviceAccount";
@@ -29,6 +30,13 @@ async function folderFiles(drive: DriveClient, folderId: string, force = false):
   const files = await drive.listFolderImages(folderId);
   folderCache = { folderId, at: Date.now(), files: new Map(files.map((f) => [f.id, f])) };
   return folderCache.files;
+}
+
+/** The Album Kata chapters from the Sheet's "Album" tab (empty when there is none). */
+export async function listAlbum(): Promise<AlbumChapter[]> {
+  const { drive, sheets, folderId } = await clients();
+  const [fileMap, values] = await Promise.all([folderFiles(drive, folderId), sheets.readTab(ALBUM_TAB)]);
+  return parseAlbumRows(values, fileMap);
 }
 
 /** Lists the museum's photos, recording any newly added Drive photos in the Sheet. */

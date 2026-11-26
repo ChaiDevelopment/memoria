@@ -26,7 +26,7 @@ export function mergeBoxes(boxes: readonly Box3Data[]): THREE.BufferGeometry | n
 }
 
 /** Horizontal floor quads at height y with world-space UVs (tiles every `tile` meters). */
-export function floorGeometry(rects: readonly RectXZ[], y: number, tile: number): THREE.BufferGeometry | null {
+export function floorGeometry(rects: readonly (RectXZ & { y?: number })[], lift: number, tile: number): THREE.BufferGeometry | null {
   if (rects.length === 0) return null;
   const positions: number[] = [];
   const normals: number[] = [];
@@ -39,6 +39,7 @@ export function floorGeometry(rects: readonly RectXZ[], y: number, tile: number)
       [r.maxX, r.minZ],
       [r.minX, r.minZ],
     ];
+    const y = (r.y ?? 0) + lift;
     for (const [x, z] of corners) {
       positions.push(x, y, z);
       normals.push(0, 1, 0);

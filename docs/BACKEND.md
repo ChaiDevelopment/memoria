@@ -92,3 +92,44 @@ own build machines do, so you don't need to build on Windows.
    redirect URIs, and set `APP_URL` to the worker URL.
 
 Every push to the main branch redeploys automatically.
+
+## Multiplayer (presence)
+
+Visitors who are signed in see each other walking around the museum.
+
+```
+Browser ──GET /api/presence/token──▶ main app (checks session + ALLOWED_EMAILS)
+        ◀── 1-minute ticket signed with SESSION_SECRET
+Browser ──WebSocket /ws?token=…──▶ presence Worker (presence/) ──▶ Durable Object "main"
+```
+
+* **presence/** is a separate, small Worker (`memora-presence`) with one
+  Durable Object per museum room. It is separate from the Next.js app so it
+  can be developed with plain `wrangler dev` on any OS.
+* Protocol: `src/shared/presence.ts`, shared by both sides and unit tested.
+  Clients send their position ≤ 5×/s **only while it changes**. The server
+  validates and clamps every message, rate-limits to 10/s per visitor,
+  rebroadcasts it, and announces joins and leaves. The room holds at most 16
+  visitors.
+* The Durable Object uses the WebSocket Hibernation API, and keep-alive pings
+  are answered by the runtime without waking it. This keeps usage within the
+  Workers Free plan. If the daily free quota is exhausted, only multiplayer
+  stops (until 00:00 UTC); the museum keeps working solo.
+* Remote avatars reuse the procedural character with a per-person sweater
+  colour, a name tag, and ~150 ms interpolation for smooth movement.
+* The HUD "visiting" count is real: it shows only while connected.
+
+**Local development**
+```bash
+# presence/.dev.vars:  SESSION_SECRET=<same as .env.local>
+npm run presence:dev          # ws://127.0.0.1:8788
+# .env.local:          PRESENCE_URL=ws://127.0.0.1:8788
+npm run build && npm start
+```
+
+**Deploy**
+```bash
+npx wrangler deploy -c presence/wrangler.jsonc
+npx wrangler secret put SESSION_SECRET -c presence/wrangler.jsonc   # same value as the app
+# main app secret: PRESENCE_URL = wss://memora-presence.<subdomain>.workers.dev
+```
