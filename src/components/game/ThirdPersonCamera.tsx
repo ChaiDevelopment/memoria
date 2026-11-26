@@ -1,25 +1,36 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
+import * as THREE from "three";
 import { CAMERA } from "@/config/gameConfig";
 import { clamp, damp } from "@/lib/math";
 import { gameStore } from "@/stores/gameStore";
 import { orbitDirection, raycastDistance } from "@/systems/camera/cameraCollision";
 import { input } from "@/systems/input/inputState";
 import type { PlayerRuntime } from "@/systems/runtime";
-import { getWorld } from "@/systems/world/buildWorld";
+import type { WorldData } from "@/systems/world/buildWorld";
 
 /**
  * Adventure-game orbit camera: mouse/touch rotates yaw & pitch around a
  * smoothed pivot above the player; a ray cast against architecture pulls the
  * camera in front of walls and ceilings (fast in, slow out).
  */
-export function ThirdPersonCamera({ runtime }: { runtime: PlayerRuntime }) {
-  const world = useMemo(() => getWorld(), []);
+export function ThirdPersonCamera({ runtime, world }: { runtime: PlayerRuntime; world: WorldData }) {
   const lastSettingsDistance = useRef<number | null>(null);
 
   useFrame(({ camera }, rawDt) => {
+    // FOV is vertical: on a tall phone screen 55° leaves only ~27° horizontally.
+    // Widen it for portrait (aspect < 1) so the museum stays visible; landscape
+    // and desktop keep the designed 55°.
+    if (camera instanceof THREE.PerspectiveCamera) {
+      const fov = camera.aspect >= 1 ? CAMERA.fov : Math.min(CAMERA.maxPortraitFov, CAMERA.fov / Math.sqrt(camera.aspect));
+      if (Math.abs(camera.fov - fov) > 0.01) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+    }
+
     const dt = Math.min(rawDt, 0.1);
     const st = gameStore.getState();
     const { settings } = st;

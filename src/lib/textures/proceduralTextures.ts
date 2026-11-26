@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { MEMORIES } from "@/config/memories";
 import type { SignDef } from "@/config/museumLayout";
 import { mulberry32 } from "@/lib/random";
 import type { Memory } from "@/types/memory";
@@ -50,29 +49,40 @@ function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { wid
   ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
 
+/** One frame in the building: its id, frame aspect, and placeholder painting (if any). */
+export interface AtlasSlot {
+  id: string;
+  aspect: number;
+  placeholder?: Memory;
+}
+
 /**
  * All museum photographs packed into one texture. Frames with a real photo
  * (`photos`, keyed by frame slot id) show it cropped to fit; the rest show
- * the procedurally painted placeholder.
+ * their procedurally painted placeholder (or a neutral tone).
  */
-export function createPhotoAtlas(cell: number, photos?: ReadonlyMap<string, HTMLImageElement>): Atlas {
-  const cols = Math.ceil(Math.sqrt(MEMORIES.length));
-  const rows = Math.ceil(MEMORIES.length / cols);
+export function createPhotoAtlas(slots: readonly AtlasSlot[], cell: number, photos?: ReadonlyMap<string, HTMLImageElement>): Atlas {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(slots.length)));
+  const rows = Math.max(1, Math.ceil(slots.length / cols));
   const [canvas, ctx] = makeCanvas(cols * cell, rows * cell);
   const rects = new Map<string, UvRect>();
-  MEMORIES.forEach((memory, i) => {
+  slots.forEach((slot, i) => {
     const cx = (i % cols) * cell;
     const cy = Math.floor(i / cols) * cell;
     const pad = 2;
     const inner = cell - pad * 2;
-    const w = memory.aspect >= 1 ? inner : Math.round(inner * memory.aspect);
-    const h = memory.aspect >= 1 ? Math.round(inner / memory.aspect) : inner;
+    const w = slot.aspect >= 1 ? inner : Math.round(inner * slot.aspect);
+    const h = slot.aspect >= 1 ? Math.round(inner / slot.aspect) : inner;
     const x = cx + Math.round((cell - w) / 2);
     const y = cy + Math.round((cell - h) / 2);
-    const photo = photos?.get(memory.id);
+    const photo = photos?.get(slot.id);
     if (photo) drawCover(ctx, photo, x, y, w, h);
-    else paintMemory(ctx, memory, x, y, w, h);
-    rects.set(memory.id, {
+    else if (slot.placeholder) paintMemory(ctx, slot.placeholder, x, y, w, h);
+    else {
+      ctx.fillStyle = "#d9cfbf";
+      ctx.fillRect(x, y, w, h);
+    }
+    rects.set(slot.id, {
       u0: x / canvas.width,
       u1: (x + w) / canvas.width,
       // Canvas Y grows downwards; texture V grows upwards (flipY = true).
@@ -84,14 +94,14 @@ export function createPhotoAtlas(cell: number, photos?: ReadonlyMap<string, HTML
 }
 
 /** Museum wall labels (year + title) for every frame; `overrides` replaces placeholder text. */
-export function createLabelAtlas(overrides?: ReadonlyMap<string, { title: string; year: number | null }>): Atlas {
+export function createLabelAtlas(slots: readonly AtlasSlot[], overrides?: ReadonlyMap<string, { title: string; year: number | null }>): Atlas {
   const cw = 512;
   const ch = 200;
   const cols = 4;
-  const rows = Math.ceil(MEMORIES.length / cols);
+  const rows = Math.max(1, Math.ceil(slots.length / cols));
   const [canvas, ctx] = makeCanvas(cw * cols, ch * rows);
   const rects = new Map<string, UvRect>();
-  MEMORIES.forEach((memory: Memory, i) => {
+  slots.forEach((slot, i) => {
     const x = (i % cols) * cw;
     const y = Math.floor(i / cols) * ch;
     ctx.fillStyle = "#f7f1e6";
@@ -101,11 +111,11 @@ export function createLabelAtlas(overrides?: ReadonlyMap<string, { title: string
     ctx.fillStyle = "#2b2118";
     ctx.font = "600 50px Georgia, 'Times New Roman', serif";
     ctx.textBaseline = "top";
-    const text = overrides?.get(memory.id) ?? memory;
+    const text = overrides?.get(slot.id) ?? slot.placeholder ?? { title: "A memory", year: null };
     ctx.fillText(text.year === null ? "—" : String(text.year), x + 52, y + 24);
     ctx.font = "italic 34px Georgia, 'Times New Roman', serif";
     wrapText(ctx, text.title, x + 52, y + 86, cw - 80, 38, 2);
-    rects.set(memory.id, { u0: x / canvas.width, u1: (x + cw) / canvas.width, v0: 1 - (y + ch) / canvas.height, v1: 1 - y / canvas.height });
+    rects.set(slot.id, { u0: x / canvas.width, u1: (x + cw) / canvas.width, v0: 1 - (y + ch) / canvas.height, v1: 1 - y / canvas.height });
   });
   return { texture: finishTexture(canvas), rects };
 }

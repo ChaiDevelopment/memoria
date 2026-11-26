@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo } from "react";
 import type * as THREE from "three";
-import { FLOORS } from "@/config/museumLayout";
 import { floorGeometry, mergeBoxes } from "@/lib/geometry";
 import { getMaterials } from "@/lib/materials";
-import { getWorld } from "@/systems/world/buildWorld";
+import type { WorldData } from "@/systems/world/buildWorld";
 import type { AreaId } from "@/types/world";
 
 interface MuseumRoomProps {
+  world: WorldData;
   area: AreaId;
   floorMaterial: THREE.Material;
 }
@@ -18,22 +18,22 @@ interface MuseumRoomProps {
  * pieces are generated from the layout data and merged per material, so a
  * room costs ~5 draw calls and is frustum-culled as a unit.
  */
-export function MuseumRoom({ area, floorMaterial }: MuseumRoomProps) {
+export function MuseumRoom({ world, area, floorMaterial }: MuseumRoomProps) {
   const mats = getMaterials();
   const geometry = useMemo(() => {
-    const geo = getWorld().areaGeometry[area];
+    const geo = world.areaGeometry[area];
     return {
-      walls: mergeBoxes(geo.wallSolids),
-      trim: mergeBoxes([...geo.wallTrim, ...geo.ceilingTrim]),
-      ceiling: mergeBoxes(geo.ceilingSlabs),
-      glass: mergeBoxes(geo.glass),
+      walls: mergeBoxes(geo?.wallSolids ?? []),
+      trim: mergeBoxes([...(geo?.wallTrim ?? []), ...(geo?.ceilingTrim ?? [])]),
+      ceiling: mergeBoxes(geo?.ceilingSlabs ?? []),
+      glass: mergeBoxes(geo?.glass ?? []),
       floor: floorGeometry(
-        FLOORS.filter((f) => f.area === area).map((f) => f.rect),
+        world.floors.filter((f) => f.area === area).map((f) => f.rect),
         0.02,
         4,
       ),
     };
-  }, [area]);
+  }, [world, area]);
 
   useEffect(
     () => () => {

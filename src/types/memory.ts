@@ -40,4 +40,6 @@ export interface PhotoPlacement {
   frame: "oak" | "black" | "gold" | "white";
   /** Freestanding photos (garden easels) get a stand instead of a wall mount. */
   mount: "wall" | "easel";
+  /** Frame width / height for frames without a placeholder memory (Memory Rooms). */
+  aspect?: number;
 }

@@ -20,10 +20,13 @@ import {
   TREE_TRUNK_RADIUS,
 } from "@/config/decorLayout";
 import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
-import { AREAS, CEILINGS, WALLS } from "@/config/museumLayout";
+import { buildWingLayout } from "@/config/memoryWing";
+import { AREAS, CEILINGS, FLOORS, TIMELINE_EAST_WALL, WALLS } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import type { Interactable } from "@/systems/interaction/interactables";
-import type { AreaId, Box3Data, BoxCollider, Collider, CylinderCollider } from "@/types/world";
+import type { BenchDef } from "@/config/decorLayout";
+import type { PhotoPlacement } from "@/types/memory";
+import type { AreaDef, AreaId, Box3Data, BoxCollider, Collider, CylinderCollider, FloorDef } from "@/types/world";
 import { buildCeiling, buildWall } from "./wallBuilder";
 
 export interface AreaGeometry {
@@ -40,6 +43,16 @@ export interface WorldData {
   cameraColliders: Collider[];
   areaGeometry: Record<AreaId, AreaGeometry>;
   interactables: Interactable[];
+  areas: AreaDef[];
+  floors: FloorDef[];
+  /** Every frame in the building (museum + Memory Rooms). */
+  placements: PhotoPlacement[];
+  /** Benches in the Memory Rooms (the museum's own are in config/decorLayout). */
+  wingBenches: BenchDef[];
+  /** Everything the player can legitimately reach. */
+  bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Number of Memory Rooms. */
+  wingRooms: number;
 }
 
 const box = (b: Box3Data, blocksCamera: boolean): BoxCollider => ({ kind: "box", blocksCamera, ...b });
@@ -58,22 +71,36 @@ function emptyAreaGeometry(): AreaGeometry {
   return { wallSolids: [], wallTrim: [], glass: [], ceilingSlabs: [], ceilingTrim: [] };
 }
 
-export function buildWorld(): WorldData {
+/**
+ * Builds the whole world. `wingFrames` = photos beyond the museum's own
+ * frames; they get Memory Rooms (see config/memoryWing.ts).
+ */
+export function buildWorld(wingFrames = 0): WorldData {
+  const wing = buildWingLayout(wingFrames);
+  const areas = [...AREAS, ...wing.areas];
+  const walls = [...WALLS, ...(wing.rooms > 0 ? wing.walls : [TIMELINE_EAST_WALL])];
+  const placements = [...PHOTO_PLACEMENTS, ...wing.placements];
   const colliders: Collider[] = [];
-  const areaGeometry = Object.fromEntries(AREAS.map((a) => [a.id, emptyAreaGeometry()])) as Record<AreaId, AreaGeometry>;
+  const areaGeometry = Object.fromEntries(areas.map((a) => [a.id, emptyAreaGeometry()])) as Record<AreaId, AreaGeometry>;
 
-  for (const wall of WALLS) {
+  const geoFor = (area: AreaId): AreaGeometry => {
+    const geo = areaGeometry[area];
+    if (!geo) throw new Error(`Geometry references unknown area "${area}"`);
+    return geo;
+  };
+
+  for (const wall of walls) {
     const pieces = buildWall(wall);
-    const geo = areaGeometry[wall.area];
+    const geo = geoFor(wall.area);
     geo.wallSolids.push(...pieces.solids);
     geo.wallTrim.push(...pieces.trim);
     geo.glass.push(...pieces.glass);
     for (const c of pieces.colliders) colliders.push(box(c, true));
   }
 
-  for (const ceiling of CEILINGS) {
+  for (const ceiling of [...CEILINGS, ...wing.ceilings]) {
     const pieces = buildCeiling(ceiling);
-    const geo = areaGeometry[ceiling.area];
+    const geo = geoFor(ceiling.area);
     geo.ceilingSlabs.push(...pieces.slabs);
     geo.ceilingTrim.push(...pieces.trim);
     geo.glass.push(...pieces.glass);
@@ -81,7 +108,7 @@ export function buildWorld(): WorldData {
   }
 
   // Furniture & decor.
-  for (const b of BENCHES) {
+  for (const b of [...BENCHES, ...wing.benches]) {
     const halfL = b.length / 2;
     const halfD = BENCH_DEPTH / 2;
     const [hx, hz] = b.along === "x" ? [halfL, halfD] : [halfD, halfL];
@@ -117,15 +144,16 @@ export function buildWorld(): WorldData {
 
   // Photographs → interactables (+ easel colliders).
   const interactables: Interactable[] = [];
-  for (const p of PHOTO_PLACEMENTS) {
+  for (const p of placements) {
     const memory = MEMORY_BY_ID.get(p.memoryId);
-    if (!memory) throw new Error(`Photo placement references unknown memory "${p.memoryId}"`);
+    const aspect = p.aspect ?? memory?.aspect;
+    if (aspect === undefined) throw new Error(`Photo placement "${p.memoryId}" has neither a memory nor an aspect`);
     const n = facingToNormal(p.facing);
     interactables.push({
       id: `photo:${p.memoryId}`,
       kind: "photo",
       memoryId: p.memoryId,
-      label: memory.title,
+      label: memory?.title ?? "A memory",
       x: p.x,
       y: p.y,
       z: p.z,
@@ -133,7 +161,7 @@ export function buildWorld(): WorldData {
       normalZ: n.z,
     });
     if (p.mount === "easel") {
-      const halfW = (p.height * memory.aspect) / 2 + 0.1;
+      const halfW = (p.height * aspect) / 2 + 0.1;
       const halfD = 0.32;
       const [hx, hz] = n.x !== 0 ? [halfD, halfW] : [halfW, halfD];
       colliders.push(box({ minX: p.x - hx, maxX: p.x + hx, minZ: p.z - hz, maxZ: p.z + hz, minY: 0, maxY: 2.0 }, false));
@@ -145,13 +173,23 @@ export function buildWorld(): WorldData {
     cameraColliders: colliders.filter((c) => c.blocksCamera),
     areaGeometry,
     interactables,
+    areas,
+    floors: [...FLOORS, ...wing.floors],
+    placements,
+    wingBenches: wing.benches,
+    bounds: { minX: -43, maxX: Math.max(42, wing.maxX + 1), minZ: -29, maxZ: 19 },
+    wingRooms: wing.rooms,
   };
 }
 
-let cached: WorldData | null = null;
+const cache = new Map<number, WorldData>();
 
-/** World data is static, so it is built once and shared. */
-export function getWorld(): WorldData {
-  if (!cached) cached = buildWorld();
-  return cached;
+/** Worlds are immutable; one per wing size is built on demand and reused. */
+export function getWorld(wingFrames = 0): WorldData {
+  let world = cache.get(wingFrames);
+  if (!world) {
+    world = buildWorld(wingFrames);
+    cache.set(wingFrames, world);
+  }
+  return world;
 }

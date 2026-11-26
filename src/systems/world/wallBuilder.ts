@@ -23,6 +23,8 @@ const BASEBOARD_HEIGHT = 0.16;
 const CROWN_HEIGHT = 0.16;
 const FRAME_WIDTH = 0.12;
 const GLASS_THICKNESS = 0.04;
+/** How far door/window frames reach into their opening (see buildWall). */
+const REVEAL = 0.02;
 
 /** Box spanning [a0, a1] along the wall's run axis and [y0, y1] vertically. */
 function wallBox(w: WallDef, a0: number, a1: number, y0: number, y1: number, thickness = w.thickness): Box3Data {
@@ -77,19 +79,22 @@ export function buildWall(w: WallDef): WallPieces {
       // Walkable: only the lintel above the doorway collides.
       if (o.top < h) pieces.colliders.push(wallBox(w, o.start, o.end, o.top, h));
       const t = w.thickness + 0.08;
-      pieces.trim.push(wallBox(w, o.start - FRAME_WIDTH, o.start, 0, o.top + FRAME_WIDTH, t));
-      pieces.trim.push(wallBox(w, o.end, o.end + FRAME_WIDTH, 0, o.top + FRAME_WIDTH, t));
-      pieces.trim.push(wallBox(w, o.start - FRAME_WIDTH, o.end + FRAME_WIDTH, o.top, o.top + FRAME_WIDTH + 0.04, t));
+      // Frame pieces reach REVEAL into the opening so they cover the wall's
+      // end faces instead of sharing their plane (which z-fights as jagged
+      // cream/walnut stripes). Visual only: the collider gap is unchanged.
+      pieces.trim.push(wallBox(w, o.start - FRAME_WIDTH, o.start + REVEAL, 0, o.top + FRAME_WIDTH, t));
+      pieces.trim.push(wallBox(w, o.end - REVEAL, o.end + FRAME_WIDTH, 0, o.top + FRAME_WIDTH, t));
+      pieces.trim.push(wallBox(w, o.start - FRAME_WIDTH, o.end + FRAME_WIDTH, o.top - REVEAL, o.top + FRAME_WIDTH + 0.04, t));
     } else {
       // Glazed: the full opening still blocks movement.
       pieces.colliders.push(wallBox(w, o.start, o.end, 0, h));
       pieces.glass.push(wallBox(w, o.start, o.end, o.bottom, o.top, GLASS_THICKNESS));
       const fw = 0.07;
       const ft = w.thickness + 0.04;
-      if (o.bottom > 0) pieces.trim.push(wallBox(w, o.start - 0.1, o.end + 0.1, o.bottom - 0.07, o.bottom, w.thickness + 0.14));
-      pieces.trim.push(wallBox(w, o.start - fw, o.end + fw, o.top, o.top + fw, ft));
-      pieces.trim.push(wallBox(w, o.start - fw, o.start, o.bottom, o.top, ft));
-      pieces.trim.push(wallBox(w, o.end, o.end + fw, o.bottom, o.top, ft));
+      if (o.bottom > 0) pieces.trim.push(wallBox(w, o.start - 0.1, o.end + 0.1, o.bottom - 0.07, o.bottom + REVEAL, w.thickness + 0.14));
+      pieces.trim.push(wallBox(w, o.start - fw, o.end + fw, o.top - REVEAL, o.top + fw, ft));
+      pieces.trim.push(wallBox(w, o.start - fw, o.start + REVEAL, o.bottom, o.top, ft));
+      pieces.trim.push(wallBox(w, o.end - REVEAL, o.end + fw, o.bottom, o.top, ft));
       // Mullions: thin bars that cast lovely shadow patterns.
       const width = o.end - o.start;
       const height = o.top - o.bottom;

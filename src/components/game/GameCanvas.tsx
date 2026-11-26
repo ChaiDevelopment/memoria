@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { CAMERA } from "@/config/gameConfig";
 import { gameStore, useGameStore } from "@/stores/gameStore";
 import { createPlayerRuntime } from "@/systems/runtime";
+import { getWorld } from "@/systems/world/buildWorld";
 import type { QualityLevel } from "@/types/game";
 import { Lighting } from "./Lighting";
 import { MuseumWorld } from "./MuseumWorld";
@@ -29,6 +30,9 @@ declare global {
 export default function GameCanvas({ onReady }: { onReady?: () => void }) {
   const runtime = useMemo(() => createPlayerRuntime(), []);
   const quality = useGameStore((s) => s.settings.quality);
+  // The world grows Memory Rooms when the visitor has more photos than frames.
+  const wingFrames = useGameStore((s) => s.wingFrames);
+  const world = useMemo(() => getWorld(wingFrames), [wingFrames]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("debug")) {
@@ -44,7 +48,9 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
       // PCF shadows; individual lights decide whether they cast (quality setting).
       shadows="percentage"
       dpr={DPR[quality]}
-      gl={{ antialias: quality !== "low", powerPreference: "high-performance", stencil: false }}
+      // MSAA stays on for Low too: it is nearly free on mobile (tile-based) GPUs
+      // and removes the jagged window/door edges; Low still saves via DPR + no shadows.
+      gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
       camera={{ fov: CAMERA.fov, near: CAMERA.near, far: CAMERA.far, position: [0, 3, 16] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -55,12 +61,12 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
     >
       <color attach="background" args={["#e6dccb"]} />
       <Suspense fallback={null}>
-        <MuseumWorld quality={quality} />
+        <MuseumWorld world={world} quality={quality} />
       </Suspense>
       <Lighting runtime={runtime} quality={quality} />
-      <PlayerController runtime={runtime} />
+      <PlayerController runtime={runtime} world={world} />
       <Player runtime={runtime} blobShadow={quality === "low"} />
-      <ThirdPersonCamera runtime={runtime} />
+      <ThirdPersonCamera runtime={runtime} world={world} />
     </Canvas>
   );
 }

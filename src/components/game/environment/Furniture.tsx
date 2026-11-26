@@ -15,6 +15,7 @@ import {
   PENDANT_LAMPS,
   POTTED_PLANTS,
   RUGS,
+  type BenchDef,
 } from "@/config/decorLayout";
 import { PHOTO_PLACEMENTS } from "@/config/memories";
 import type { InstanceTransform } from "@/lib/geometry";
@@ -40,14 +41,14 @@ function usePrimitives() {
   return prims;
 }
 
-export function Furniture() {
+export function Furniture({ wingBenches = [] }: { wingBenches?: readonly BenchDef[] }) {
   const mats = getMaterials();
   const prims = usePrimitives();
 
   const items = useMemo(() => {
     const benchWood: InstanceTransform[] = [];
     const benchLegs: InstanceTransform[] = [];
-    for (const b of BENCHES) {
+    for (const b of [...BENCHES, ...wingBenches]) {
       const rot = b.along === "x" ? 0 : Math.PI / 2;
       benchWood.push({ x: b.x, y: BENCH_SEAT_HEIGHT - 0.04, z: b.z, rotationY: rot, sx: b.length, sy: 0.08, sz: BENCH_DEPTH });
       for (const side of [-1, 1]) {
@@ -109,7 +110,7 @@ export function Furniture() {
     }));
 
     return { benchWood, benchLegs, columnShafts, columnCaps, pots, trunks, leaves, rods, shades, bulbs, inlay, medallions };
-  }, []);
+  }, [wingBenches]);
 
   return (
     <group name="furniture">

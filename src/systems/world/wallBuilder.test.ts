@@ -100,3 +100,16 @@ describe("buildCeiling", () => {
     expect(c.slabs.length).toBeGreaterThan(1);
   });
 });
+
+describe("frame trim", () => {
+  it("covers the wall's end faces at openings instead of sharing their plane (no z-fighting)", () => {
+    const wall = { ...baseWall, openings: [{ kind: "door" as const, start: 4, end: 6, bottom: 0, top: 3 }] };
+    const pieces = buildWall(wall);
+    // The solid piece left of the door ends at x = 4; some trim must extend past it into the opening.
+    const solidEnd = Math.max(...pieces.solids.filter((s) => s.maxX <= 4 + 1e-9).map((s) => s.maxX));
+    expect(solidEnd).toBe(4);
+    expect(pieces.trim.some((t) => t.minX < 4 && t.maxX > 4 && t.minY === 0)).toBe(true);
+    // Collision gap is unchanged.
+    expect(pieces.colliders.filter((c) => c.minX < 5 && c.maxX > 5 && c.minY < 1)).toHaveLength(0);
+  });
+});

@@ -209,7 +209,13 @@ export const WALLS: WallDef[] = [
       { kind: "window", start: 30, end: 33, bottom: 1.0, top: 3.9 },
     ],
   },
-  {
+];
+
+/**
+ * The Timeline Hall's end wall (with a window). When Memory Rooms exist it is
+ * replaced by the first room's doorway wall (see config/memoryWing.ts).
+ */
+export const TIMELINE_EAST_WALL: WallDef = {
     id: "timeline-east",
     area: "timeline",
     axis: "z",
@@ -220,8 +226,7 @@ export const WALLS: WallDef[] = [
     thickness: T,
     exterior: true,
     openings: [{ kind: "window", start: 5, end: 9, bottom: 0.6, top: 4.2 }],
-  },
-];
+  };
 
 export const CEILINGS: CeilingDef[] = [
   {

@@ -32,6 +32,8 @@ export interface GameState {
   /** The signed-in user's photos hung in the museum: frame slot id → photo. */
   exhibits: Record<string, ExhibitPhoto>;
   exhibitsStatus: "loading" | "signed-out" | "ready" | "error";
+  /** Photos beyond the museum's own frames — they open Memory Rooms. */
+  wingFrames: number;
 
   enterMuseum: () => void;
   openMenu: () => void;
@@ -45,7 +47,7 @@ export interface GameState {
   updateSettings: (patch: Partial<GameSettings>) => void;
   resetSettings: () => void;
   setDebugColliders: (on: boolean) => void;
-  setExhibits: (status: GameState["exhibitsStatus"], exhibits?: Record<string, ExhibitPhoto>) => void;
+  setExhibits: (status: GameState["exhibitsStatus"], exhibits?: Record<string, ExhibitPhoto>, wingFrames?: number) => void;
 }
 
 function defaultQuality(): QualityLevel {
@@ -80,6 +82,7 @@ export const useGameStore = create<GameState>()(
       debugColliders: false,
       exhibits: {},
       exhibitsStatus: "loading",
+      wingFrames: 0,
 
       enterMuseum: () => set({ phase: "playing", menuOpen: false }),
       openMenu: () => {
@@ -106,7 +109,8 @@ export const useGameStore = create<GameState>()(
       updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
       resetSettings: () => set({ settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() } }),
       setDebugColliders: (debugColliders) => set({ debugColliders }),
-      setExhibits: (exhibitsStatus, exhibits) => set(exhibits ? { exhibitsStatus, exhibits } : { exhibitsStatus }),
+      setExhibits: (exhibitsStatus, exhibits, wingFrames) =>
+        set({ exhibitsStatus, ...(exhibits ? { exhibits } : {}), ...(wingFrames !== undefined ? { wingFrames } : {}) }),
     }),
     {
       name: "memora-settings",

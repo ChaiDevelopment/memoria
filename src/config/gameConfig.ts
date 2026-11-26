@@ -27,6 +27,8 @@ export const PLAYER = {
 
 export const CAMERA = {
   fov: 55,
+  /** Portrait screens widen the vertical FOV (up to this) so the view isn't a narrow slit. */
+  maxPortraitFov: 75,
   near: 0.08,
   far: 260,
   defaultDistance: 4.4,

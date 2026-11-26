@@ -3,11 +3,11 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
+import { MEMORY_BY_ID } from "@/config/memories";
 import { texturedQuadsGeometry, type InstanceTransform, type TexturedQuad } from "@/lib/geometry";
 import { facingToNormal, facingToRotationY } from "@/lib/math";
 import { getMaterials } from "@/lib/materials";
-import { createLabelAtlas, createPhotoAtlas } from "@/lib/textures/proceduralTextures";
+import { createLabelAtlas, createPhotoAtlas, type AtlasSlot } from "@/lib/textures/proceduralTextures";
 import { useGameStore } from "@/stores/gameStore";
 import type { PhotoPlacement } from "@/types/memory";
 import { Instanced } from "./Instanced";
@@ -36,12 +36,12 @@ interface PhotoLayout {
 }
 
 function layoutFor(p: PhotoPlacement): PhotoLayout {
-  const memory = MEMORY_BY_ID.get(p.memoryId);
-  if (!memory) throw new Error(`Unknown memory ${p.memoryId}`);
+  const aspect = p.aspect ?? MEMORY_BY_ID.get(p.memoryId)?.aspect;
+  if (aspect === undefined) throw new Error(`Frame ${p.memoryId} has no aspect`);
   const rotY = facingToRotationY(p.facing);
   return {
     placement: p,
-    width: p.height * memory.aspect,
+    width: p.height * aspect,
     height: p.height,
     mat: p.mount === "easel" ? 0.045 : 0.085,
     rotY,
@@ -104,18 +104,26 @@ function useExhibitImages(): ReadonlyMap<string, HTMLImageElement> | undefined {
   return images;
 }
 
-export function Photographs({ atlasCell }: { atlasCell: number }) {
+export function Photographs({ placements, atlasCell }: { placements: readonly PhotoPlacement[]; atlasCell: number }) {
   const mats = getMaterials();
   const exhibits = useGameStore((s) => s.exhibits);
   const exhibitImages = useExhibitImages();
-  const photoAtlas = useMemo(() => createPhotoAtlas(atlasCell, exhibitImages), [atlasCell, exhibitImages]);
+  const slots = useMemo<AtlasSlot[]>(
+    () =>
+      placements.map((p) => {
+        const memory = MEMORY_BY_ID.get(p.memoryId);
+        return { id: p.memoryId, aspect: p.aspect ?? memory?.aspect ?? 1.5, placeholder: memory };
+      }),
+    [placements],
+  );
+  const photoAtlas = useMemo(() => createPhotoAtlas(slots, atlasCell, exhibitImages), [slots, atlasCell, exhibitImages]);
   const labelAtlas = useMemo(
-    () => createLabelAtlas(new Map(Object.entries(exhibits).map(([slot, p]) => [slot, { title: p.title, year: p.year }]))),
-    [exhibits],
+    () => createLabelAtlas(slots, new Map(Object.entries(exhibits).map(([slot, p]) => [slot, { title: p.title, year: p.year }]))),
+    [slots, exhibits],
   );
 
   const built = useMemo(() => {
-    const layouts = PHOTO_PLACEMENTS.map(layoutFor);
+    const layouts = placements.map(layoutFor);
     const frames: InstanceTransform[] = [];
     const mounts: InstanceTransform[] = [];
     const lightBars: InstanceTransform[] = [];
@@ -169,7 +177,7 @@ export function Photographs({ atlasCell }: { atlasCell: number }) {
       photos: texturedQuadsGeometry(photoQuads),
       labels: texturedQuadsGeometry(labelQuads),
     };
-  }, [photoAtlas, labelAtlas]);
+  }, [placements, photoAtlas, labelAtlas]);
 
   const photoMaterial = useMemo(() => new THREE.MeshStandardMaterial({ map: photoAtlas.texture, roughness: 0.55 }), [photoAtlas]);
   const labelMaterial = useMemo(() => new THREE.MeshStandardMaterial({ map: labelAtlas.texture, roughness: 0.9 }), [labelAtlas]);
@@ -197,13 +205,13 @@ export function Photographs({ atlasCell }: { atlasCell: number }) {
       <Instanced geometry={boxGeometry} material={mats.oak} items={built.easelWood} />
       {built.photos && <mesh geometry={built.photos} material={photoMaterial} receiveShadow />}
       {built.labels && <mesh geometry={built.labels} material={labelMaterial} receiveShadow />}
-      <InteractionHighlight />
+      <InteractionHighlight placements={placements} />
     </group>
   );
 }
 
 /** A soft pulsing frame around the photograph the player can currently inspect. */
-function InteractionHighlight() {
+function InteractionHighlight({ placements }: { placements: readonly PhotoPlacement[] }) {
   const nearby = useGameStore((s) => s.nearby);
   const inspecting = useGameStore((s) => s.inspectingId);
   const ref = useRef<THREE.Mesh>(null);
@@ -213,9 +221,9 @@ function InteractionHighlight() {
   );
   const layout = useMemo(() => {
     if (!nearby) return null;
-    const p = PHOTO_PLACEMENTS.find((pl) => pl.memoryId === nearby.memoryId);
+    const p = placements.find((pl) => pl.memoryId === nearby.memoryId);
     return p ? layoutFor(p) : null;
-  }, [nearby]);
+  }, [nearby, placements]);
 
   const geometry = useMemo(() => {
     if (!layout) return null;

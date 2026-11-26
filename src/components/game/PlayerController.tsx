@@ -1,8 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
-import { PHOTO_PLACEMENTS } from "@/config/memories";
+import { useRef } from "react";
 import { SPAWN } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import { gameStore, isGameplayBlocked } from "@/stores/gameStore";
@@ -12,20 +11,17 @@ import { findInteractable } from "@/systems/interaction/interactables";
 import { stepMotor } from "@/systems/movement/characterMotor";
 import type { PlayerRuntime } from "@/systems/runtime";
 import { areaAt } from "@/systems/world/areas";
-import { getWorld } from "@/systems/world/buildWorld";
+import type { WorldData } from "@/systems/world/buildWorld";
 
 /** Largest simulated step; longer frames (tab switches, hitches) are clamped. */
 const MAX_DT = 1 / 20;
 
-/** Bounds of everything the player can legitimately reach. */
-const PLAYABLE = { minX: -43, maxX: 42, minZ: -29, maxZ: 19 };
 
 /**
  * Translates input into motion every frame: camera-relative movement,
  * jumping, collision, animation state, area tracking and interaction lookup.
  */
-export function PlayerController({ runtime }: { runtime: PlayerRuntime }) {
-  const world = useMemo(() => getWorld(), []);
+export function PlayerController({ runtime, world }: { runtime: PlayerRuntime; world: WorldData }) {
   const areaTimer = useRef(0);
 
   useFrame((_, rawDt) => {
@@ -49,7 +45,7 @@ export function PlayerController({ runtime }: { runtime: PlayerRuntime }) {
     // While inspecting, turn to face the photograph.
     let faceTowards: number | null = null;
     if (st.inspectingId) {
-      const placement = PHOTO_PLACEMENTS.find((p) => p.memoryId === st.inspectingId);
+      const placement = world.placements.find((p) => p.memoryId === st.inspectingId);
       if (placement) {
         const n = facingToNormal(placement.facing);
         faceTowards = Math.atan2(-n.x, -n.z);
@@ -61,7 +57,8 @@ export function PlayerController({ runtime }: { runtime: PlayerRuntime }) {
 
     // Safety net: anything outside the playable envelope returns to the lobby.
     const p = motor.position;
-    if (p.x < PLAYABLE.minX || p.x > PLAYABLE.maxX || p.z < PLAYABLE.minZ || p.z > PLAYABLE.maxZ) {
+    const b = world.bounds;
+    if (p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ) {
       p.x = SPAWN.x;
       p.y = SPAWN.y;
       p.z = SPAWN.z;
@@ -81,7 +78,7 @@ export function PlayerController({ runtime }: { runtime: PlayerRuntime }) {
     areaTimer.current -= dt;
     if (areaTimer.current <= 0) {
       areaTimer.current = 0.2;
-      const area = areaAt(p.x, p.z);
+      const area = areaAt(p.x, p.z, world.areas);
       if (area) st.setCurrentArea(area.id);
     }
     if (!st.inspectingId) {

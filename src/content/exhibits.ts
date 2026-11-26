@@ -22,7 +22,7 @@ export interface FrameSlot {
   slotId: string;
   /** Frame width / height. */
   aspect: number;
-  section: "gallery" | "timeline" | "garden";
+  section: "gallery" | "timeline" | "garden" | "room";
 }
 
 type Orientation = "landscape" | "portrait" | "square";

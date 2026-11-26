@@ -216,6 +216,7 @@ export function outdoorTreeScatter(): TreeDef[] {
     { minX: -15, maxX: 15, minZ: -28, maxZ: 16 }, // lobby + gallery
     { minX: 7, maxX: 45, minZ: -1, maxZ: 15 }, // timeline hall
     { minX: -17, maxX: 17, minZ: 12, maxZ: 31 }, // entrance plaza
+    { minX: 39, maxX: 220, minZ: -3, maxZ: 17 }, // room for the Memory Rooms to grow east
   ];
   const blocked = (x: number, z: number) =>
     keepOut.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);

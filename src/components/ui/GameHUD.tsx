@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AREAS } from "@/config/museumLayout";
+import { areaInfo } from "@/systems/world/areas";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useGameStore } from "@/stores/gameStore";
 import { CollapseIcon, EmblemIcon, ExpandIcon, SettingsIcon, VisitorsIcon } from "./icons";
@@ -26,14 +26,15 @@ export function GameHUD() {
 function BrandBlock() {
   const museumName = useGameStore((s) => s.museumName);
   const currentArea = useGameStore((s) => s.currentArea);
-  const area = AREAS.find((a) => a.id === currentArea);
+  const area = areaInfo(currentArea);
   return (
     <div className="absolute left-[max(14px,env(safe-area-inset-left))] top-[max(14px,env(safe-area-inset-top))] flex flex-col gap-1.5">
       <div className="hud-panel flex items-center gap-3 rounded-2xl px-4 py-2.5">
         <EmblemIcon size={22} className="text-gold" />
         <div className="leading-tight">
           <div className="font-display text-[15px] tracking-[0.42em] text-ivory sm:text-base">MEMORA</div>
-          <div className="max-w-[46vw] truncate font-display text-[12px] italic text-ivory/70 sm:text-[13px]">{museumName}</div>
+          {/* Hidden on narrow phones so the brand never collides with the top-right buttons. */}
+          <div className="hidden max-w-[46vw] truncate font-display text-[12px] italic text-ivory/70 min-[440px]:block sm:text-[13px]">{museumName}</div>
         </div>
       </div>
       {area && (
@@ -111,10 +112,10 @@ function AreaBanner() {
     const t = window.setTimeout(() => setShown(null), 3200);
     return () => window.clearTimeout(t);
   }, [currentArea]);
-  const area = AREAS.find((a) => a.id === shown);
+  const area = areaInfo(shown);
   if (!area) return null;
   return (
-    <div key={area.id} className="area-banner absolute left-1/2 top-[18%] w-max max-w-[92vw] text-center">
+    <div key={shown} className="area-banner absolute left-1/2 top-[18%] w-max max-w-[92vw] text-center">
       <div className="mx-auto mb-2 h-px w-24 bg-gradient-to-r from-transparent via-gold to-transparent" />
       <div className="font-display text-3xl tracking-[0.12em] text-ivory drop-shadow-[0_2px_12px_rgba(0,0,0,0.45)] sm:text-5xl">{area.name}</div>
       <div className="mt-2 font-display text-sm italic text-ivory/80 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)] sm:text-base">{area.subtitle}</div>
@@ -141,24 +142,32 @@ function BottomPrompts() {
   const exhibitTitle = useGameStore((s) => (s.nearby ? s.exhibits[s.nearby.memoryId]?.title : undefined));
   if (menuOpen || inspecting) return null;
 
-  return (
-    <div className="absolute bottom-[max(16px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 flex-col items-center gap-3">
-      {nearby && (
-        <div className={`prompt-pop hud-panel flex items-center gap-3 rounded-full py-2 pl-2 pr-5 ${isTouch ? "mb-28" : ""}`}>
+  const prompt = nearby && (
+    <div className="prompt-pop hud-panel flex max-w-[92vw] items-center gap-3 rounded-full py-2 pl-2 pr-5">
           {isTouch ? (
-            <span className="rounded-full bg-gold px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink">Tap ✋</span>
+            <span className="shrink-0 rounded-full bg-gold px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink">Tap ✋</span>
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
           )}
-          <span className="text-sm text-ivory">
+          <span className="min-w-0 truncate text-sm text-ivory">
             Inspect <span className="font-display italic text-gold">“{exhibitTitle ?? nearby.label}”</span>
           </span>
-        </div>
-      )}
-      {!isTouch && !pointerLocked && !nearby && (
+    </div>
+  );
+
+  // Touch: joystick and action buttons own the bottom corners, so the prompt
+  // sits at the top centre, below the brand bar.
+  if (isTouch) {
+    return prompt ? <div className="absolute left-1/2 top-[max(118px,calc(env(safe-area-inset-top)+104px))] -translate-x-1/2">{prompt}</div> : null;
+  }
+
+  return (
+    <div className="absolute bottom-[max(16px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 flex-col items-center gap-3">
+      {prompt}
+      {!pointerLocked && !nearby && (
         <div className="hud-panel rounded-full px-4 py-1.5 text-xs text-ivory/85">Click the view to look around with the mouse</div>
       )}
-      {!isTouch && showHints && (
+      {showHints && (
         <div className="hud-panel hidden items-center gap-4 rounded-2xl px-4 py-2 text-[11px] text-ivory/75 md:flex">
           <span className="flex items-center gap-1.5">
             <Key>W</Key>

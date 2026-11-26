@@ -30,7 +30,8 @@ export interface CylinderCollider {
 
 export type Collider = BoxCollider | CylinderCollider;
 
-export type AreaId = "lobby" | "gallery" | "timeline" | "garden";
+/** Fixed areas, plus the Memory Rooms added as the collection grows ("room-1", "room-2", …). */
+export type AreaId = "lobby" | "gallery" | "timeline" | "garden" | `room-${number}`;
 
 export interface AreaDef {
   id: AreaId;

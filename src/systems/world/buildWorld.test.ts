@@ -56,14 +56,16 @@ describe("museum world", () => {
   });
 
   it("connects all four areas by walkable paths", () => {
-    const probes: Record<AreaId, [number, number]> = {
+    const probes: Partial<Record<AreaId, [number, number]>> = {
       lobby: [0, 11],
       gallery: [-9, -5],
       timeline: [36, 7],
       garden: [-35, -20],
     };
     for (const area of AREAS) {
-      const [x, z] = probes[area.id];
+      const probe = probes[area.id];
+      if (!probe) throw new Error(`No probe for ${area.id}`);
+      const [x, z] = probe;
       expect(areaAt(x, z)?.id).toBe(area.id);
       expect(reachable(x, z), `${area.name} should be reachable from spawn`).toBe(true);
     }
