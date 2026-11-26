@@ -13,11 +13,30 @@ async function clients() {
   return { drive: new DriveClient(token), sheets: new SheetsClient(token, e.SHEET_ID), folderId: e.DRIVE_FOLDER_ID };
 }
 
+/**
+ * Short-lived cache of the folder listing (id → file). It is the source of
+ * truth for "is this file part of the museum?" — Drive does not return
+ * `parents` for files owned by someone else, so membership can't be checked
+ * per file. Cached thumbnail links also save one Google call per image.
+ */
+const FOLDER_CACHE_MS = 5 * 60_000;
+let folderCache: { folderId: string; at: number; files: Map<string, DriveFile> } | null = null;
+
+async function folderFiles(drive: DriveClient, folderId: string, force = false): Promise<Map<string, DriveFile>> {
+  if (!force && folderCache && folderCache.folderId === folderId && Date.now() - folderCache.at < FOLDER_CACHE_MS) {
+    return folderCache.files;
+  }
+  const files = await drive.listFolderImages(folderId);
+  folderCache = { folderId, at: Date.now(), files: new Map(files.map((f) => [f.id, f])) };
+  return folderCache.files;
+}
+
 /** Lists the museum's photos, recording any newly added Drive photos in the Sheet. */
 export async function listLibrary(): Promise<LibraryPhoto[]> {
   const { drive, sheets, folderId } = await clients();
   await sheets.ensureTab();
-  const [files, rows] = await Promise.all([drive.listFolderImages(folderId), sheets.readRows()]);
+  const [fileMap, rows] = await Promise.all([folderFiles(drive, folderId, true), sheets.readRows()]);
+  const files = [...fileMap.values()];
   const { photos, newRows } = mergeLibrary(files, rows, takenAtFor);
   await sheets.appendRows(newRows);
   return photos;
@@ -61,15 +80,9 @@ export async function updatePhoto(fileId: string, patch: z.infer<typeof photoUpd
  */
 export async function photoImage(fileId: string, size: number) {
   const { drive, folderId } = await clients();
-  let file: DriveFile;
-  try {
-    file = await drive.getFile(fileId);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) throw new ApiError(404, "photo_not_found", "Photo not found.");
-    throw err;
-  }
-  if (!file.parents?.includes(folderId) || !file.mimeType.startsWith("image/")) {
-    throw new ApiError(404, "photo_not_found", "Photo not found.");
-  }
+  let file = (await folderFiles(drive, folderId)).get(fileId);
+  // A photo added since the cache was filled: refresh once before giving up.
+  if (!file) file = (await folderFiles(drive, folderId, true)).get(fileId);
+  if (!file) throw new ApiError(404, "photo_not_found", "Photo not found.");
   return drive.imageBytes(file, size);
 }
