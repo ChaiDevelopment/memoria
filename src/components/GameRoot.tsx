@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useDesktopControls } from "@/hooks/useDesktopControls";
 import { useInputDevice } from "@/hooks/useInputDevice";
+import { useMuseumExhibits } from "@/hooks/useMuseumExhibits";
 import { GameErrorBoundary } from "./ui/ErrorBoundary";
 import { GameHUD } from "./ui/GameHUD";
 import { InspectOverlay } from "./ui/InspectOverlay";
@@ -21,6 +22,7 @@ export default function GameRoot() {
   const onReady = useCallback(() => setReady(true), []);
   useDesktopControls(surface);
   useInputDevice();
+  useMuseumExhibits();
 
   return (
     <div ref={surface} id="memora-game" className="fixed inset-0 overflow-hidden bg-[#e6dccb] select-none" onContextMenu={(e) => e.preventDefault()}>

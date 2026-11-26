@@ -42,8 +42,20 @@ function finishTexture(canvas: HTMLCanvasElement, anisotropy = 4): THREE.CanvasT
   return tex;
 }
 
-/** All memory photographs packed into one texture. */
-export function createPhotoAtlas(cell: number): Atlas {
+/** Draws `img` into the rect, scaled to cover it and centre-cropped (CSS object-fit: cover). */
+function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const sw = w / scale;
+  const sh = h / scale;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
+}
+
+/**
+ * All museum photographs packed into one texture. Frames with a real photo
+ * (`photos`, keyed by frame slot id) show it cropped to fit; the rest show
+ * the procedurally painted placeholder.
+ */
+export function createPhotoAtlas(cell: number, photos?: ReadonlyMap<string, HTMLImageElement>): Atlas {
   const cols = Math.ceil(Math.sqrt(MEMORIES.length));
   const rows = Math.ceil(MEMORIES.length / cols);
   const [canvas, ctx] = makeCanvas(cols * cell, rows * cell);
@@ -57,7 +69,9 @@ export function createPhotoAtlas(cell: number): Atlas {
     const h = memory.aspect >= 1 ? Math.round(inner / memory.aspect) : inner;
     const x = cx + Math.round((cell - w) / 2);
     const y = cy + Math.round((cell - h) / 2);
-    paintMemory(ctx, memory, x, y, w, h);
+    const photo = photos?.get(memory.id);
+    if (photo) drawCover(ctx, photo, x, y, w, h);
+    else paintMemory(ctx, memory, x, y, w, h);
     rects.set(memory.id, {
       u0: x / canvas.width,
       u1: (x + w) / canvas.width,
@@ -69,8 +83,8 @@ export function createPhotoAtlas(cell: number): Atlas {
   return { texture: finishTexture(canvas, 8), rects };
 }
 
-/** Museum wall labels (title, year, caption) for every memory. */
-export function createLabelAtlas(): Atlas {
+/** Museum wall labels (year + title) for every frame; `overrides` replaces placeholder text. */
+export function createLabelAtlas(overrides?: ReadonlyMap<string, { title: string; year: number | null }>): Atlas {
   const cw = 512;
   const ch = 200;
   const cols = 4;
@@ -87,9 +101,10 @@ export function createLabelAtlas(): Atlas {
     ctx.fillStyle = "#2b2118";
     ctx.font = "600 50px Georgia, 'Times New Roman', serif";
     ctx.textBaseline = "top";
-    ctx.fillText(String(memory.year), x + 52, y + 24);
+    const text = overrides?.get(memory.id) ?? memory;
+    ctx.fillText(text.year === null ? "—" : String(text.year), x + 52, y + 24);
     ctx.font = "italic 34px Georgia, 'Times New Roman', serif";
-    wrapText(ctx, memory.title, x + 52, y + 86, cw - 80, 38, 2);
+    wrapText(ctx, text.title, x + 52, y + 86, cw - 80, 38, 2);
     rects.set(memory.id, { u0: x / canvas.width, u1: (x + cw) / canvas.width, v0: 1 - (y + ch) / canvas.height, v1: 1 - y / canvas.height });
   });
   return { texture: finishTexture(canvas), rects };

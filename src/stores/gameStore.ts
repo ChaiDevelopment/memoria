@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { CAMERA } from "@/config/gameConfig";
+import type { ExhibitPhoto } from "@/content/exhibits";
 import type { GameSettings, QualityLevel } from "@/types/game";
 import type { AreaId } from "@/types/world";
 
@@ -28,6 +29,9 @@ export interface GameState {
   settings: GameSettings;
   /** Developer aid: render collision volumes (not persisted). */
   debugColliders: boolean;
+  /** The signed-in user's photos hung in the museum: frame slot id → photo. */
+  exhibits: Record<string, ExhibitPhoto>;
+  exhibitsStatus: "loading" | "signed-out" | "ready" | "error";
 
   enterMuseum: () => void;
   openMenu: () => void;
@@ -41,6 +45,7 @@ export interface GameState {
   updateSettings: (patch: Partial<GameSettings>) => void;
   resetSettings: () => void;
   setDebugColliders: (on: boolean) => void;
+  setExhibits: (status: GameState["exhibitsStatus"], exhibits?: Record<string, ExhibitPhoto>) => void;
 }
 
 function defaultQuality(): QualityLevel {
@@ -73,6 +78,8 @@ export const useGameStore = create<GameState>()(
       museumName: "The Museum of Small Moments",
       settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() },
       debugColliders: false,
+      exhibits: {},
+      exhibitsStatus: "loading",
 
       enterMuseum: () => set({ phase: "playing", menuOpen: false }),
       openMenu: () => {
@@ -99,6 +106,7 @@ export const useGameStore = create<GameState>()(
       updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
       resetSettings: () => set({ settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() } }),
       setDebugColliders: (debugColliders) => set({ debugColliders }),
+      setExhibits: (exhibitsStatus, exhibits) => set(exhibits ? { exhibitsStatus, exhibits } : { exhibitsStatus }),
     }),
     {
       name: "memora-settings",

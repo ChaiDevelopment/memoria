@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
 import { texturedQuadsGeometry, type InstanceTransform, type TexturedQuad } from "@/lib/geometry";
@@ -63,10 +63,56 @@ function labelPosition(l: PhotoLayout): { x: number; y: number; z: number } {
   return { x: p.x + l.n.x * out, y: p.y - outerH - 0.08 - LABEL_H / 2, z: p.z + l.n.z * out };
 }
 
+function loadImage(url: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+  return img.decode().then(() => img);
+}
+
+/**
+ * Loads the thumbnails of the visitor's photos assigned to frames.
+ * Until they arrive (or if some fail) the placeholder paintings stay up.
+ */
+function useExhibitImages(): ReadonlyMap<string, HTMLImageElement> | undefined {
+  const exhibits = useGameStore((s) => s.exhibits);
+  const [images, setImages] = useState<ReadonlyMap<string, HTMLImageElement>>();
+  useEffect(() => {
+    const entries = Object.entries(exhibits);
+    if (entries.length === 0) {
+      setImages(undefined);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      entries.map(([slot, photo]) =>
+        loadImage(photo.thumbUrl).then(
+          (img) => [slot, img] as const,
+          () => null,
+        ),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const loaded = results.filter((r): r is readonly [string, HTMLImageElement] => r !== null);
+      if (loaded.length < entries.length) console.warn(`[MEMORA] ${entries.length - loaded.length} photo(s) could not be loaded.`);
+      setImages(new Map(loaded));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [exhibits]);
+  return images;
+}
+
 export function Photographs({ atlasCell }: { atlasCell: number }) {
   const mats = getMaterials();
-  const photoAtlas = useMemo(() => createPhotoAtlas(atlasCell), [atlasCell]);
-  const labelAtlas = useMemo(() => createLabelAtlas(), []);
+  const exhibits = useGameStore((s) => s.exhibits);
+  const exhibitImages = useExhibitImages();
+  const photoAtlas = useMemo(() => createPhotoAtlas(atlasCell, exhibitImages), [atlasCell, exhibitImages]);
+  const labelAtlas = useMemo(
+    () => createLabelAtlas(new Map(Object.entries(exhibits).map(([slot, p]) => [slot, { title: p.title, year: p.year }]))),
+    [exhibits],
+  );
 
   const built = useMemo(() => {
     const layouts = PHOTO_PLACEMENTS.map(layoutFor);

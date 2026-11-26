@@ -138,6 +138,7 @@ function BottomPrompts() {
   const isTouch = useGameStore((s) => s.isTouch);
   const showHints = useGameStore((s) => s.settings.showHints);
   const pointerLocked = useGameStore((s) => s.pointerLocked);
+  const exhibitTitle = useGameStore((s) => (s.nearby ? s.exhibits[s.nearby.memoryId]?.title : undefined));
   if (menuOpen || inspecting) return null;
 
   return (
@@ -150,7 +151,7 @@ function BottomPrompts() {
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
           )}
           <span className="text-sm text-ivory">
-            Inspect <span className="font-display italic text-gold">“{nearby.label}”</span>
+            Inspect <span className="font-display italic text-gold">“{exhibitTitle ?? nearby.label}”</span>
           </span>
         </div>
       )}
