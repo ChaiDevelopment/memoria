@@ -17,8 +17,8 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const next = safeNext(params.next);
-  const { user, configError } = await pageUser();
-  if (user) redirect(next);
+  const { signedIn, configError } = await pageUser();
+  if (signedIn) redirect(next);
   const errorCode = typeof params.error === "string" ? params.error : null;
 
   return (
@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       ) : (
         <div className="mx-auto w-full max-w-sm text-center">
           <h1 className="font-display text-3xl">Welcome to MEMORA</h1>
-          <p className="mt-2 text-sm text-ivory/60">Sign in with the Google account that was invited to this museum.</p>
+          <p className="mt-2 text-sm text-ivory/60">Sign in with your Google account to manage your museum or invitation.</p>
           {errorCode && (
             <p role="alert" className="mt-6 rounded-xl border border-ember/40 bg-ember/10 px-3 py-2 text-left text-sm">
               {ERRORS[errorCode] ?? "Sign-in failed. Please try again."}

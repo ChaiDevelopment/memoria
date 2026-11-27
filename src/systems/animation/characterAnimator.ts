@@ -157,6 +157,25 @@ function inspect(p: Pose, t: number) {
   p[HIPS_Y] = -0.01;
 }
 
+/** Seated on a chair: hips drop to seat height, thighs forward, shins down, hands in the lap. */
+export const SIT_HIPS_DROP = -0.44;
+function sit(p: Pose, t: number) {
+  const breath = Math.sin(t * 2.1);
+  p.fill(0);
+  set(p, "spine", -0.05 + 0.015 * breath);
+  set(p, "chest", 0.02 * breath);
+  set(p, "head", 0.06 + 0.03 * Math.sin(t * 0.6), Math.sin(t * 0.33) * 0.25, 0);
+  set(p, "lThigh", -1.5, 0, 0.07);
+  set(p, "rThigh", -1.5, 0, -0.07);
+  set(p, "lShin", 1.5);
+  set(p, "rShin", 1.5);
+  set(p, "lUpperArm", -0.42, 0, 0.12);
+  set(p, "rUpperArm", -0.42, 0, -0.12);
+  set(p, "lForearm", -0.95, 0, 0);
+  set(p, "rForearm", -0.95, 0, 0);
+  p[HIPS_Y] = SIT_HIPS_DROP;
+}
+
 export interface AnimatorInput {
   state: AnimationStateName;
   horizontalSpeed: number;
@@ -164,10 +183,10 @@ export interface AnimatorInput {
   landed: boolean;
 }
 
-const STATES: AnimationStateName[] = ["idle", "walk", "run", "jump", "inspect"];
+const STATES: AnimationStateName[] = ["idle", "walk", "run", "jump", "inspect", "sit"];
 
 export class CharacterAnimator {
-  readonly weights: Record<AnimationStateName, number> = { idle: 1, walk: 0, run: 0, jump: 0, inspect: 0 };
+  readonly weights: Record<AnimationStateName, number> = { idle: 1, walk: 0, run: 0, jump: 0, inspect: 0, sit: 0 };
   readonly pose: Pose = new Float32Array(POSE_SIZE);
   private readonly scratch: Pose = new Float32Array(POSE_SIZE);
   private time = 0;
@@ -213,6 +232,9 @@ export class CharacterAnimator {
         case "inspect":
           inspect(p, this.time);
           break;
+        case "sit":
+          sit(p, this.time);
+          break;
       }
       for (let i = 0; i < POSE_SIZE; i++) this.pose[i]! += p[i]! * w;
     }
@@ -237,7 +259,9 @@ export function selectAnimationState(opts: {
   horizontalSpeed: number;
   inspecting: boolean;
   wantsRun: boolean;
+  seated?: boolean;
 }): AnimationStateName {
+  if (opts.seated) return "sit";
   if (opts.inspecting) return "inspect";
   if (!opts.grounded) return "jump";
   if (opts.horizontalSpeed < 0.35) return "idle";

@@ -30,8 +30,10 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
   const root = useRef<THREE.Group>(null);
   const model = useRef<CharacterModelHandle>(null);
   const animator = useMemo(() => new CharacterAnimator(), []);
-  const label = peer.guest ? `${peer.name} · Guest` : peer.name;
-  const tag = useMemo(() => createNameTag(label), [label]);
+  const wedding = useGameStore((s) => s.world.kind === "wedding");
+  // The couple are labelled (and dressed) as such — the server decides who they are.
+  const label = peer.couple ? `${peer.name} · Pengantin` : peer.guest && !wedding ? `${peer.name} · Guest` : peer.name;
+  const tag = useMemo(() => createNameTag(label, !!peer.couple), [label, peer.couple]);
   useEffect(() => () => (tag.material.map?.dispose(), tag.material.dispose()), [tag]);
 
   useFrame((_, rawDt) => {
@@ -49,14 +51,14 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
 
   return (
     <group ref={root} name={`visitor-${peer.name}`} visible={false}>
-      <ProceduralCharacter ref={model} sweater={SWEATER_COLORS[peer.color % SWEATER_COLORS.length]} />
+      <ProceduralCharacter ref={model} sweater={SWEATER_COLORS[peer.color % SWEATER_COLORS.length]} outfit={peer.couple === "bride" ? "gown" : peer.couple === "groom" ? "suit" : "explorer"} />
       <primitive object={tag} position={[0, 2.15, 0]} />
     </group>
   );
 }
 
 /** A small floating name label (canvas sprite — no font loading, one draw call). */
-function createNameTag(name: string): THREE.Sprite {
+function createNameTag(name: string, couple = false): THREE.Sprite {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   const font = "600 44px ui-sans-serif, system-ui, sans-serif";
@@ -65,7 +67,7 @@ function createNameTag(name: string): THREE.Sprite {
     ctx.font = font;
     canvas.width = Math.ceil(ctx.measureText(name).width) + 48;
     ctx.font = font;
-    ctx.fillStyle = "rgba(27,20,15,0.72)";
+    ctx.fillStyle = couple ? "rgba(166,124,58,0.9)" : "rgba(27,20,15,0.72)";
     const r = 30;
     ctx.beginPath();
     ctx.roundRect(0, 6, canvas.width, 60, r);

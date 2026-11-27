@@ -10,5 +10,7 @@ export async function authorize(token: string | null, secret: string | undefined
   const claims = await verifyValue<PresenceTokenClaims>(token, secret);
   if (!claims || typeof claims.exp !== "number" || claims.exp < now) return null;
   if (typeof claims.email !== "string" || typeof claims.room !== "string") return null;
+  // The museum ("main") or one invitation's room.
+  if (!/^(main|inv-[A-Za-z0-9_-]{10,40})$/.test(claims.room)) return null;
   return claims;
 }

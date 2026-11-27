@@ -26,8 +26,10 @@ export function GameHUD() {
 function BrandBlock() {
   const museumName = useGameStore((s) => s.museumName);
   const viewer = useGameStore((s) => s.viewer);
+  const wedding = useGameStore((s) => s.world.kind === "wedding");
   const currentArea = useGameStore((s) => s.currentArea);
   const area = areaInfo(currentArea);
+  const badge = viewer?.role === "bride" || viewer?.role === "groom" ? "Pengantin" : viewer?.role === "host" ? "Pemilik" : viewer?.role === "visitor" ? (wedding ? "Tamu" : "Guest") : null;
   return (
     <div className="absolute left-[max(14px,env(safe-area-inset-left))] top-[max(14px,env(safe-area-inset-top))] flex flex-col gap-1.5">
       <div className="hud-panel flex items-center gap-3 rounded-2xl px-4 py-2.5">
@@ -38,9 +40,9 @@ function BrandBlock() {
           <div className="hidden max-w-[46vw] truncate font-display text-[12px] italic text-ivory/70 min-[440px]:block sm:text-[13px]">{museumName}</div>
         </div>
       </div>
-      {viewer?.role === "visitor" && (
-        <div className="hud-panel w-fit rounded-full px-3 py-1 text-[11px] tracking-wide text-ivory/80" title="You're visiting with the museum's keyword">
-          <span className="mr-1.5 rounded-full bg-gold px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-ink">Guest</span>
+      {viewer && badge && (
+        <div className="hud-panel w-fit rounded-full px-3 py-1 text-[11px] tracking-wide text-ivory/80" title={wedding ? "Kamu berada di undangan ini" : "You're visiting with the museum's keyword"}>
+          <span className="mr-1.5 rounded-full bg-gold px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-ink">{badge}</span>
           {viewer.name}
         </div>
       )}
@@ -155,9 +157,23 @@ function BottomPrompts() {
   const albumTitle = useGameStore((s) => (s.nearby?.kind === "album" ? s.album[Number(s.nearby.memoryId.replace("album-", ""))]?.title : undefined));
   const albumOpen = useGameStore((s) => s.albumIndex !== null);
   const guestbookOpen = useGameStore((s) => s.guestbookOpen);
-  if (menuOpen || inspecting || albumOpen || guestbookOpen) return null;
+  const panelOpen = useGameStore((s) => s.panel !== null);
+  const seated = useGameStore((s) => s.seatedId !== null);
+  const wedding = useGameStore((s) => s.world.kind === "wedding");
+  if (menuOpen || inspecting || albumOpen || guestbookOpen || panelOpen) return null;
 
-  const prompt = nearby && (
+  const prompt = seated ? (
+    <div className="prompt-pop hud-panel flex max-w-[92vw] items-center gap-3 rounded-full py-2 pl-2 pr-5" data-testid="seated-prompt">
+      {isTouch ? (
+        <span className="shrink-0 rounded-full bg-gold px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink">Tap ✋</span>
+      ) : (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold font-sans text-sm font-bold text-ink">E</span>
+      )}
+      <span className="text-sm text-ivory">
+        <span className="font-display italic text-gold">Berdiri</span> {isTouch ? "· atau gerakkan stik" : "· atau tekan WASD"}
+      </span>
+    </div>
+  ) : nearby && (
     <div className="prompt-pop hud-panel flex max-w-[92vw] items-center gap-3 rounded-full py-2 pl-2 pr-5">
           {isTouch ? (
             <span className="shrink-0 rounded-full bg-gold px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink">Tap ✋</span>
@@ -166,8 +182,27 @@ function BottomPrompts() {
           )}
           <span className="min-w-0 truncate text-sm text-ivory">
             {nearby.kind === "guestbook" ? (
+              wedding ? (
+                <>
+                  Tulis <span className="font-display italic text-gold">Ucapan &amp; Doa</span>
+                </>
+              ) : (
+                <>
+                  Open the <span className="font-display italic text-gold">Guest Book</span>
+                </>
+              )
+            ) : nearby.kind === "seat" ? (
               <>
-                Open the <span className="font-display italic text-gold">Guest Book</span>
+                {nearby.label === "Kursi pengantin" ? "Duduk di " : ""}
+                <span className="font-display italic text-gold">{nearby.label === "Kursi pengantin" ? "kursi pengantin" : "Duduk"}</span>
+              </>
+            ) : nearby.kind === "envelope" ? (
+              <>
+                Buka <span className="font-display italic text-gold">Amplop Digital</span>
+              </>
+            ) : nearby.kind === "info" ? (
+              <>
+                Lihat <span className="font-display italic text-gold">Info Acara</span>
               </>
             ) : nearby.kind === "album" ? (
               <>
@@ -179,7 +214,7 @@ function BottomPrompts() {
               </>
             ) : (
               <>
-                Inspect <span className="font-display italic text-gold">“{exhibitTitle ?? nearby.label}”</span>
+                {wedding ? "Lihat" : "Inspect"} <span className="font-display italic text-gold">“{wedding ? "Foto prewedding" : (exhibitTitle ?? nearby.label)}”</span>
               </>
             )}
           </span>

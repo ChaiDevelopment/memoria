@@ -3,13 +3,34 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { CAMERA } from "@/config/gameConfig";
 import type { ExhibitPhoto } from "@/content/exhibits";
 
-/** A guest book message as served by /api/guestbook. */
+/** A guest book message (or an invitation's "Ucapan & Doa") as served by /api/guestbook. */
 export interface GuestbookEntryView {
   time: string;
   name: string;
   message: string;
   guest: boolean;
+  role?: "owner" | "visitor" | "bride" | "groom" | "host";
 }
+
+/** A wedding invitation as guests see it (/api/invitation). */
+export interface InvitationView {
+  keyword: string;
+  title: string;
+  brideName: string;
+  groomName: string;
+  setting: "outdoor" | "indoor";
+  welcome: string;
+  events: { label: string; date: string; time: string; endTime: string; place: string; address: string; mapsUrl: string }[];
+  banks: { bank: string; number: string; holder: string }[];
+  /** Local start of the first event (YYYY-MM-DDTHH:mm:ss), for the countdown. */
+  startsAt: string | null;
+}
+
+/** owner = the admins' museum; host = creator of a museum world; bride / groom = a wedding's couple. */
+export type ViewerRole = "owner" | "visitor" | "bride" | "groom" | "host";
+/** Which world is loaded: the museum, or a wedding venue. */
+export type WorldTheme = { kind: "museum" } | { kind: "wedding"; invitation: InvitationView };
+export type WeddingPanel = "envelope" | "info" | null;
 
 /** An Album Kata chapter as served by /api/album. */
 export interface AlbumChapterView {
@@ -36,9 +57,15 @@ export interface GameState {
   /** Memory id currently being inspected, or null. */
   inspectingId: string | null;
   /** Interactable the player can currently use. */
-  nearby: { id: string; kind: "photo" | "lift" | "album" | "guestbook"; memoryId: string; label: string } | null;
-  /** Who is visiting: an owner (Google sign-in) or a keyword visitor; null = nobody yet. */
-  viewer: { role: "owner" | "visitor"; name: string } | null;
+  nearby: { id: string; kind: "photo" | "lift" | "album" | "guestbook" | "envelope" | "info" | "seat"; memoryId: string; label: string } | null;
+  /** The seat the player is sitting on (wedding venue), or null. */
+  seatedId: string | null;
+  /** Who is visiting: an owner, a keyword visitor, or one of the couple; null = nobody yet. */
+  viewer: { role: ViewerRole; name: string } | null;
+  /** The museum, or a wedding invitation's venue. */
+  world: WorldTheme;
+  /** Wedding venue overlays: the digital envelope or the event details. */
+  panel: WeddingPanel;
   viewerStatus: "loading" | "ready";
   /** Bumped when the visitor joins / leaves, so photos and presence reload. */
   accessVersion: number;
@@ -82,6 +109,10 @@ export interface GameState {
   interact: () => void;
   closeLiftMenu: () => void;
   setViewer: (viewer: GameState["viewer"], museumName?: string) => void;
+  setWorld: (world: WorldTheme) => void;
+  standUp: () => void;
+  openPanel: (panel: WeddingPanel) => void;
+  closePanel: () => void;
   refreshAccess: () => void;
   setGuestbook: (entries: GuestbookEntryView[]) => void;
   openGuestbook: () => void;
@@ -127,6 +158,9 @@ export const useGameStore = create<GameState>()(
       nearby: null,
       liftMenuOpen: false,
       viewer: null,
+      world: { kind: "museum" },
+      panel: null,
+      seatedId: null,
       viewerStatus: "loading",
       accessVersion: 0,
       guestbook: [],
@@ -151,7 +185,7 @@ export const useGameStore = create<GameState>()(
       enterMuseum: () => set({ phase: "playing", menuOpen: false }),
       openMenu: () => {
         if (get().phase !== "playing") return;
-        set({ menuOpen: true, inspectingId: null, liftMenuOpen: false, albumIndex: null, guestbookOpen: false });
+        set({ menuOpen: true, inspectingId: null, liftMenuOpen: false, albumIndex: null, guestbookOpen: false, panel: null });
       },
       closeMenu: () => set({ menuOpen: false }),
       openInspect: (memoryId) => {
@@ -164,10 +198,14 @@ export const useGameStore = create<GameState>()(
         set({ nearby });
       },
       interact: () => {
-        const { nearby, menuOpen, phase } = get();
+        const { nearby, menuOpen, phase, seatedId } = get();
+        // Already sitting: the interact button stands up again.
+        if (seatedId && !menuOpen && phase === "playing") return set({ seatedId: null });
         if (!nearby || menuOpen || phase !== "playing") return;
         if (nearby.kind === "lift") set({ liftMenuOpen: true });
         else if (nearby.kind === "guestbook") set({ guestbookOpen: true });
+        else if (nearby.kind === "envelope" || nearby.kind === "info") set({ panel: nearby.kind });
+        else if (nearby.kind === "seat") set({ seatedId: nearby.memoryId, nearby: null });
         else if (nearby.kind === "album") {
           const index = Number(nearby.memoryId.replace("album-", ""));
           if (get().album[index]) set({ albumIndex: index });
@@ -176,6 +214,14 @@ export const useGameStore = create<GameState>()(
       },
       closeLiftMenu: () => set({ liftMenuOpen: false }),
       setViewer: (viewer, museumName) => set({ viewer, viewerStatus: "ready", ...(museumName ? { museumName } : {}) }),
+      setWorld: (world) => {
+        const cur = get().world;
+        if (cur.kind === world.kind && (cur.kind === "museum" || JSON.stringify(cur) === JSON.stringify(world))) return;
+        set({ world, nearby: null, panel: null, seatedId: null, currentArea: null, currentFloor: 0 });
+      },
+      standUp: () => set({ seatedId: null }),
+      openPanel: (panel) => set({ panel }),
+      closePanel: () => set({ panel: null }),
       refreshAccess: () => set({ accessVersion: get().accessVersion + 1, viewerStatus: "loading" }),
       setGuestbook: (guestbook) => set({ guestbook }),
       openGuestbook: () => set({ guestbookOpen: true }),
@@ -222,6 +268,6 @@ export const useGameStore = create<GameState>()(
 /** Convenience for non-React code (game loop, event handlers). */
 export const gameStore = useGameStore;
 
-export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex" | "guestbookOpen">): boolean {
-  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null || s.guestbookOpen;
+export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex" | "guestbookOpen" | "panel">): boolean {
+  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null || s.guestbookOpen || s.panel !== null;
 }

@@ -9,14 +9,14 @@ import { gameStore } from "@/stores/gameStore";
 import { orbitDirection, raycastDistance } from "@/systems/camera/cameraCollision";
 import { input } from "@/systems/input/inputState";
 import type { PlayerRuntime } from "@/systems/runtime";
-import type { WorldData } from "@/systems/world/buildWorld";
+import type { PlayWorld } from "@/systems/world/playWorld";
 
 /**
  * Adventure-game orbit camera: mouse/touch rotates yaw & pitch around a
  * smoothed pivot above the player; a ray cast against architecture pulls the
  * camera in front of walls and ceilings (fast in, slow out).
  */
-export function ThirdPersonCamera({ runtime, world }: { runtime: PlayerRuntime; world: WorldData }) {
+export function ThirdPersonCamera({ runtime, world }: { runtime: PlayerRuntime; world: PlayWorld }) {
   const lastSettingsDistance = useRef<number | null>(null);
 
   useFrame(({ camera }, rawDt) => {

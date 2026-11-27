@@ -1,4 +1,4 @@
-export type AnimationStateName = "idle" | "walk" | "run" | "jump" | "inspect";
+export type AnimationStateName = "idle" | "walk" | "run" | "jump" | "inspect" | "sit";
 
 export type QualityLevel = "low" | "medium" | "high";
 

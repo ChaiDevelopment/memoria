@@ -3,11 +3,14 @@ import { ApiError } from "../http";
 
 /**
  * "Sign in with Google" (OpenID Connect, authorization code + PKCE).
- * Only basic identity scopes are requested — MEMORA never touches the
- * user's own Drive; photos are read by the server's service account.
+ * Signing in asks only for basic identity. Creating an invitation also asks
+ * for `drive.file` — access to the files MEMORA itself creates, never the
+ * rest of the person's Drive — so the invitation's folder can be made in
+ * their own My Drive. That access token is used once and never stored.
  */
 
 export const SCOPES = ["openid", "email", "profile"];
+export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
@@ -22,19 +25,28 @@ export async function createPkce() {
   return { verifier, challenge: await sha256Base64Url(verifier), state: randomToken(24), nonce: randomToken(16) };
 }
 
-export function buildAuthUrl(cfg: OAuthClientConfig, p: { state: string; challenge: string; nonce: string }): string {
+export function buildAuthUrl(
+  cfg: OAuthClientConfig,
+  p: { state: string; challenge: string; nonce: string },
+  opts: { extraScopes?: string[]; loginHint?: string } = {},
+): string {
   const url = new URL(AUTH_URL);
-  url.search = new URLSearchParams({
+  const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
     response_type: "code",
-    scope: SCOPES.join(" "),
+    scope: [...SCOPES, ...(opts.extraScopes ?? [])].join(" "),
     state: p.state,
     nonce: p.nonce,
     code_challenge: p.challenge,
     code_challenge_method: "S256",
-    prompt: "select_account",
-  }).toString();
+  });
+  if (opts.loginHint) {
+    // Same account as the MEMORA session; no account picker.
+    params.set("login_hint", opts.loginHint);
+    params.set("include_granted_scopes", "true");
+  } else params.set("prompt", "select_account");
+  url.search = params.toString();
   return url.toString();
 }
 
@@ -57,6 +69,17 @@ export async function exchangeCodeForIdentity(
   expectedNonce: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<GoogleIdentity> {
+  return (await exchangeCode(cfg, code, verifier, expectedNonce, fetchImpl)).identity;
+}
+
+/** The verified identity plus the short-lived access token and the scopes actually granted. */
+export async function exchangeCode(
+  cfg: OAuthClientConfig,
+  code: string,
+  verifier: string,
+  expectedNonce: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ identity: GoogleIdentity; accessToken: string | null; scopes: string[] }> {
   const res = await fetchImpl(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -69,9 +92,13 @@ export async function exchangeCodeForIdentity(
       grant_type: "authorization_code",
     }).toString(),
   });
-  const data = (await res.json().catch(() => ({}))) as { id_token?: string; error?: string };
+  const data = (await res.json().catch(() => ({}))) as { id_token?: string; access_token?: string; scope?: string; error?: string };
   if (!res.ok || !data.id_token) throw new ApiError(502, "google_token_error", `Google sign-in failed (${data.error ?? res.status}).`);
-  return identityFromIdToken(data.id_token, cfg.clientId, expectedNonce);
+  return {
+    identity: identityFromIdToken(data.id_token, cfg.clientId, expectedNonce),
+    accessToken: data.access_token ?? null,
+    scopes: (data.scope ?? "").split(/\s+/).filter(Boolean),
+  };
 }
 
 export function identityFromIdToken(idToken: string, clientId: string, expectedNonce: string, now = Date.now()): GoogleIdentity {

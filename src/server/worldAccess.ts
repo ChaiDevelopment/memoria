@@ -88,21 +88,31 @@ export async function matchesWorld(keyword: string, settings: WorldSettings | nu
   return (await keywordHash(k)) === (await keywordHash(settings.keyword));
 }
 
-export async function issueVisitorPass(visitor: Visitor, settings: WorldSettings, secret: string, now = Date.now()): Promise<{ value: string; expires: Date }> {
+export async function issueVisitorPass(visitor: Visitor, settings: Pick<WorldSettings, "keyword">, secret: string, now = Date.now()): Promise<{ value: string; expires: Date }> {
   const exp = now + VISITOR_PASS_DAYS * 86_400_000;
   const pass: VisitorPass = { v: 1, id: visitor.id, name: visitor.name, kh: await keywordHash(settings.keyword), exp };
   return { value: await signValue(pass, secret), expires: new Date(exp) };
 }
 
-/** The visitor behind a pass, or null if it is forged, expired, or the world closed / changed keyword. */
-export async function readVisitorPass(value: string | undefined, secret: string, settings: WorldSettings | null, now = Date.now()): Promise<Visitor | null> {
-  if (!value || !settings || !settings.published) return null;
+/**
+ * A verified, unexpired pass: who the visitor is and which world (keyword
+ * hash) it was issued for. The caller still checks that world is published.
+ */
+export async function decodeVisitorPass(value: string | undefined, secret: string, now = Date.now()): Promise<(Visitor & { kh: string }) | null> {
+  if (!value) return null;
   const pass = await verifyValue<VisitorPass>(value, secret);
-  if (!pass || pass.v !== 1 || typeof pass.exp !== "number" || pass.exp <= now) return null;
-  if (pass.kh !== (await keywordHash(settings.keyword))) return null;
+  if (!pass || pass.v !== 1 || typeof pass.exp !== "number" || pass.exp <= now || typeof pass.kh !== "string") return null;
   const name = sanitizeVisitorName(pass.name);
   if (!name || typeof pass.id !== "string" || !/^[A-Za-z0-9_-]{6,40}$/.test(pass.id)) return null;
-  return { id: pass.id, name };
+  return { id: pass.id, name, kh: pass.kh };
+}
+
+/** The visitor behind a pass, or null if it is forged, expired, or the world closed / changed keyword. */
+export async function readVisitorPass(value: string | undefined, secret: string, settings: WorldSettings | null, now = Date.now()): Promise<Visitor | null> {
+  if (!settings || !settings.published) return null;
+  const pass = await decodeVisitorPass(value, secret, now);
+  if (!pass || pass.kh !== (await keywordHash(settings.keyword))) return null;
+  return { id: pass.id, name: pass.name };
 }
 
 /** Best-effort, per-instance attempt limiter (no database). */

@@ -47,7 +47,9 @@ export type AreaId =
   | `room-${number}`
   | `upper-${number}`
   | `hall-${number}-${number}`
-  | `balcony-${number}`;
+  | `balcony-${number}`
+  /** Wedding venue areas. */
+  | `w-${string}`;
 
 export interface AreaDef {
   id: AreaId;

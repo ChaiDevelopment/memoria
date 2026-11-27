@@ -15,7 +15,7 @@ const SHADOW_MAP: Record<QualityLevel, number> = { low: 0, medium: 1024, high: 2
  * player (snapped to shadow-map texels to avoid shimmering), so a modest
  * shadow map stays crisp across the whole museum.
  */
-export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality: QualityLevel }) {
+export function Lighting({ runtime, quality, theme = "museum" }: { runtime: PlayerRuntime; quality: QualityLevel; theme?: "museum" | "outdoor" | "indoor" }) {
   const light = useRef<THREE.DirectionalLight>(null);
   const atriumLight = useRef<THREE.PointLight>(null);
   const hallLight = useRef<THREE.PointLight>(null);
@@ -24,7 +24,9 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
   const mapSize = SHADOW_MAP[quality];
   const shadows = mapSize > 0;
   const extent = WORLD.shadowExtent;
-  const dir = useMemo(() => new THREE.Vector3(...WORLD.sunDirection).normalize(), []);
+  // The wedding garden is lit by a low golden sunset; the ballroom by its own lamps.
+  const dir = useMemo(() => (theme === "museum" ? new THREE.Vector3(...WORLD.sunDirection) : new THREE.Vector3(-0.55, 0.35, -0.75)).normalize(), [theme]);
+  const museum = theme === "museum";
 
   // Soft image-based fill from a procedural studio environment (no network fetch).
   useEffect(() => {
@@ -74,8 +76,8 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
         key={mapSize}
         ref={light}
         target={target}
-        color="#ffe3bd"
-        intensity={2.6}
+        color={museum ? "#ffe3bd" : "#ffcf9a"}
+        intensity={museum ? 2.6 : theme === "outdoor" ? 2.3 : 0.6}
         castShadow={shadows}
         shadow-mapSize={[Math.max(mapSize, 512), Math.max(mapSize, 512)]}
         shadow-camera-left={-extent}
@@ -87,9 +89,9 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
         shadow-bias={-0.0004}
         shadow-normalBias={0.035}
       />
-      <hemisphereLight args={["#dbe8f7", "#a88a63", 0.85]} />
-      <ambientLight color="#ffe8c8" intensity={0.18} />
-      {quality !== "low" && (
+      <hemisphereLight args={museum ? ["#dbe8f7", "#a88a63", 0.85] : theme === "outdoor" ? ["#f6d6c0", "#7f8f5a", 0.8] : ["#ffe6c8", "#8a6a4a", 0.7]} />
+      <ambientLight color="#ffe8c8" intensity={museum ? 0.18 : 0.28} />
+      {museum && quality !== "low" && (
         <>
           <pointLight position={[0, 5.2, 7]} color="#ffd9a0" intensity={22} distance={18} decay={1.6} />
           <pointLight position={[0, 4.6, -12]} color="#ffe2b5" intensity={20} distance={18} decay={1.6} />
@@ -98,7 +100,7 @@ export function Lighting({ runtime, quality }: { runtime: PlayerRuntime; quality
           <pointLight ref={hallLight} position={[22, 4.2, 21]} color="#ffd9a0" intensity={0} distance={18} decay={1.6} />
         </>
       )}
-      <fog attach="fog" args={["#e6dccb", 55, 210]} />
+      <fog attach="fog" args={museum ? ["#e6dccb", 55, 210] : theme === "outdoor" ? ["#f1d9c2", 45, 160] : ["#2a2018", 40, 90]} />
     </>
   );
 }

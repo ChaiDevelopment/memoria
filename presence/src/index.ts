@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { authorize } from "../../src/shared/presenceAuth";
 import {
   colorIndexFor,
+  chosenName,
   displayName,
   MAX_PEERS,
   MIN_STATE_INTERVAL_MS,
@@ -52,7 +53,8 @@ export default {
 
     const stub = env.PRESENCE.get(env.PRESENCE.idFromName(claims.room));
     const headers = new Headers(request.headers);
-    headers.set("x-memora-user", JSON.stringify({ email: claims.email, name: claims.name, guest: claims.guest === true }));
+    const couple = claims.couple === "bride" || claims.couple === "groom" ? claims.couple : undefined;
+    headers.set("x-memora-user", JSON.stringify({ email: claims.email, name: claims.name, guest: claims.guest === true, couple }));
     return stub.fetch(new Request(request.url, { headers }));
   },
 } satisfies ExportedHandler<Env>;
@@ -65,7 +67,7 @@ export class MuseumPresence extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    let user: { email: string; name: string; guest?: boolean };
+    let user: { email: string; name: string; guest?: boolean; couple?: "bride" | "groom" };
     try {
       user = JSON.parse(request.headers.get("x-memora-user") ?? "");
     } catch {
@@ -84,9 +86,10 @@ export class MuseumPresence extends DurableObject<Env> {
 
     const peer: PeerInfo = {
       id: crypto.randomUUID().slice(0, 8),
-      name: displayName(user.name, user.email),
+      name: user.guest || user.couple ? chosenName(user.name, user.email) : displayName(user.name, user.email),
       color: colorIndexFor(user.email),
       ...(user.guest ? { guest: true } : {}),
+      ...(user.couple === "bride" || user.couple === "groom" ? { couple: user.couple } : {}),
     };
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ peer, s: null, last: 0 } satisfies Attachment);

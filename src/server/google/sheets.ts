@@ -89,11 +89,11 @@ export class SheetsClient {
     return (data.values ?? []).map((v, i) => valuesToRow(v, i + 2)).filter((r): r is MemoryRow => r !== null);
   }
 
-  /** Raw rows of another tab (A2:D), or [] when the tab doesn't exist. */
-  async readTab(tab: string): Promise<unknown[][]> {
+  /** Raw rows of another tab (A2:<lastCol>), or [] when the tab doesn't exist. */
+  async readTab(tab: string, lastCol = "D"): Promise<unknown[][]> {
     const meta = (await this.call("?fields=sheets.properties.title")) as { sheets?: { properties?: { title?: string } }[] };
     if (!meta.sheets?.some((s) => s.properties?.title === tab)) return [];
-    const data = (await this.call(`/values/${encodeURIComponent(`${tab}!A2:D`)}?valueRenderOption=FORMATTED_VALUE`)) as { values?: unknown[][] };
+    const data = (await this.call(`/values/${encodeURIComponent(`${tab}!A2:${lastCol}`)}?valueRenderOption=FORMATTED_VALUE`)) as { values?: unknown[][] };
     return data.values ?? [];
   }
 
@@ -109,10 +109,18 @@ export class SheetsClient {
   }
 
   /** Appends plain-text rows (RAW: never interpreted as formulas). */
-  async appendToTab(tab: string, rows: (string | number)[][]): Promise<void> {
-    await this.call(`/values/${encodeURIComponent(`${tab}!A:D`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+  async appendToTab(tab: string, rows: (string | number)[][], lastCol = "D"): Promise<void> {
+    await this.call(`/values/${encodeURIComponent(`${tab}!A:${lastCol}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
       method: "POST",
       body: JSON.stringify({ values: rows }),
+    });
+  }
+
+  /** Overwrites one row of a tab (plain text, never formulas). `row` is 1-based. */
+  async updateTabRow(tab: string, row: number, values: (string | number)[], lastCol: string): Promise<void> {
+    await this.call(`/values/${encodeURIComponent(`${tab}!A${row}:${lastCol}${row}`)}?valueInputOption=RAW`, {
+      method: "PUT",
+      body: JSON.stringify({ values: [values] }),
     });
   }
 

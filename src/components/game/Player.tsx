@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { CAMERA } from "@/config/gameConfig";
 import { damp } from "@/lib/math";
 import { CharacterAnimator } from "@/systems/animation/characterAnimator";
+import { useGameStore } from "@/stores/gameStore";
 import type { PlayerRuntime } from "@/systems/runtime";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
 import type { CharacterModelHandle } from "./character/types";
@@ -22,6 +23,8 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   const groundY = useRef(0);
   /** Rendered feet height: eases over stair steps instead of popping (physics stays exact). */
   const visualY = useRef<number | null>(null);
+  // The couple wear their wedding outfits in their own invitation's venue.
+  const outfit = useGameStore((s) => (s.world.kind !== "wedding" ? "explorer" : s.viewer?.role === "bride" ? "gown" : s.viewer?.role === "groom" ? "suit" : "explorer"));
 
   // Soft contact shadow, used when real-time shadows are disabled (low quality).
   const blobMaterial = useMemo(() => {
@@ -82,7 +85,7 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   return (
     <>
       <group ref={root} name="player">
-        <ProceduralCharacter ref={model} />
+        <ProceduralCharacter ref={model} outfit={outfit} />
       </group>
       {blobShadow && (
         <mesh ref={blob} material={blobMaterial} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>

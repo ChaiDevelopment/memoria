@@ -21,12 +21,13 @@ import {
 } from "@/config/decorLayout";
 import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
 import { buildGrandLayout, GUESTBOOK_STAND, type GrandLayout } from "@/config/grandMuseum";
-import { AREAS, CEILINGS, FLOORS, WALLS } from "@/config/museumLayout";
+import { AREAS, CEILINGS, FLOORS, SPAWN, WALLS } from "@/config/museumLayout";
 import { facingToNormal } from "@/lib/math";
 import type { Interactable } from "@/systems/interaction/interactables";
 import type { BenchDef } from "@/config/decorLayout";
 import type { PhotoPlacement } from "@/types/memory";
 import type { AreaDef, AreaId, Box3Data, BoxCollider, Collider, CylinderCollider, FloorDef } from "@/types/world";
+import type { PlayWorld } from "./playWorld";
 import { buildStairFlight } from "./stairBuilder";
 import { buildCeiling, buildWall } from "./wallBuilder";
 
@@ -45,7 +46,7 @@ export interface AtriumGeometry {
   railings: Box3Data[];
 }
 
-export interface WorldData {
+export interface WorldData extends PlayWorld {
   colliders: Collider[];
   /** Subset of colliders the third-person camera must stay in front of. */
   cameraColliders: Collider[];
@@ -250,6 +251,7 @@ export function buildWorld(wingFrames = 0, albumChapters = 0): WorldData {
     placements,
     wingBenches: [],
     bounds: { minX: -43, maxX: Math.max(42, grand.maxX + 1), minZ: -29, maxZ: 51 },
+    spawn: SPAWN,
     grand,
     atrium,
   };

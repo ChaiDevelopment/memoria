@@ -9,7 +9,9 @@ import { ApiError } from "../http";
  */
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-export const SA_SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/spreadsheets"];
+// Full Drive scope so MEMORA can create each invitation's folder. The service
+// account still only reaches files shared with it or created by it.
+export const SA_SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
 
 export interface ServiceAccountConfig {
   email: string;

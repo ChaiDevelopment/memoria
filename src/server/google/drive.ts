@@ -61,6 +61,33 @@ export class DriveClient {
     return files;
   }
 
+  private async send(url: string, method: string, body: unknown): Promise<unknown> {
+    const res = await this.fetchImpl(url, { method, headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    if (!res.ok) throw driveError(res.status, data.error?.message);
+    return data;
+  }
+
+  /** Creates a folder (inside `parentId`, or in the service account's own space). Folders use no storage quota. */
+  async createFolder(name: string, parentId?: string): Promise<string> {
+    const data = (await this.send(`${BASE}?fields=id&supportsAllDrives=true`, "POST", {
+      name,
+      mimeType: "application/vnd.google-apps.folder",
+      ...(parentId ? { parents: [parentId] } : {}),
+    })) as { id?: string };
+    if (!data.id) throw new ApiError(502, "drive_error", "Google Drive did not return the new folder.");
+    return data.id;
+  }
+
+  /**
+   * Shares a file with a Google account, without Google's notification email
+   * (MEMORA tells the person on the website instead).
+   */
+  async shareWith(fileId: string, email: string, role: "reader" | "writer"): Promise<void> {
+    const params = new URLSearchParams({ sendNotificationEmail: "false", supportsAllDrives: "true", fields: "id" });
+    await this.send(`${BASE}/${encodeURIComponent(fileId)}/permissions?${params}`, "POST", { type: "user", role, emailAddress: email });
+  }
+
   async getFile(fileId: string): Promise<DriveFile> {
     const params = new URLSearchParams({ fields: FIELDS, supportsAllDrives: "true" });
     return fileSchema.parse(await (await this.get(`${BASE}/${encodeURIComponent(fileId)}?${params}`)).json());

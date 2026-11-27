@@ -5,7 +5,8 @@ import { MEMORY_BY_ID, PHOTO_PLACEMENTS } from "@/config/memories";
 import { buildGrandLayout, MAX_HALL_FRAMES } from "@/config/grandMuseum";
 import { assignExhibits, type ExhibitPhoto, type FrameSlot } from "@/content/exhibits";
 import { api } from "@/lib/apiClient";
-import { gameStore, useGameStore, type AlbumChapterView, type GuestbookEntryView } from "@/stores/gameStore";
+import { gameStore, useGameStore, type AlbumChapterView, type GuestbookEntryView, type InvitationView, type ViewerRole } from "@/stores/gameStore";
+import { weddingFrameSlots } from "@/systems/world/buildWedding";
 import type { PhotoPlacement } from "@/types/memory";
 
 function slotFor(p: PhotoPlacement, section: FrameSlot["section"]): FrameSlot {
@@ -28,10 +29,17 @@ export function frameSlotsFor(photoCount: number): { slots: FrameSlot[]; wingFra
   return { slots: [...FRAME_SLOTS, ...wing], wingFrames };
 }
 
+interface Me {
+  user: { name: string | null; email: string; admin: boolean } | null;
+  viewer: { role: ViewerRole; name: string } | null;
+  world: { kind: "museum"; name: string } | { kind: "invitation"; theme: "wedding" | "museum"; name: string; keyword: string } | null;
+}
+
 /**
- * Loads the museum's photos for its owners and keyword visitors and hangs
- * them, opening Memory Halls for photos beyond the museum's own frames.
- * Anyone else (the demo tour) sees the placeholder paintings.
+ * Loads the world the visitor is in and hangs its photos: the museum (for
+ * its owners and keyword visitors, opening Memory Halls as needed) or a
+ * wedding invitation's venue. Anyone else (the demo tour) sees the
+ * placeholder paintings.
  */
 export function useMuseumExhibits() {
   const accessVersion = useGameStore((st) => st.accessVersion);
@@ -40,20 +48,39 @@ export function useMuseumExhibits() {
     const store = gameStore.getState();
     (async () => {
       try {
-        const me = await api<{ user: { name: string | null; email: string } | null; visitor: { name: string } | null; world: { name: string } | null }>("/api/auth/me");
+        const me = await api<Me>("/api/auth/me");
         if (cancelled) return;
-        const viewer = me.user
-          ? { role: "owner" as const, name: me.user.name?.trim().split(/\s+/)[0] || me.user.email.split("@")[0]! }
-          : me.visitor
-            ? { role: "visitor" as const, name: me.visitor.name }
-            : null;
-        store.setViewer(viewer, me.world?.name);
+        const viewer = me.viewer;
         if (!viewer) {
+          store.setViewer(null);
+          store.setWorld({ kind: "museum" });
           store.setExhibits("signed-out", {}, 0);
           store.setAlbum([]);
           store.setGuestbook([]);
           return;
         }
+
+        if (me.world?.kind === "invitation" && me.world.theme === "wedding") {
+          // A wedding invitation: its details, prewedding photos and wishes.
+          const [{ invitation }, { photos }] = await Promise.all([
+            api<{ invitation: InvitationView | null }>("/api/invitation"),
+            api<{ photos: ExhibitPhoto[] }>("/api/photos"),
+          ]);
+          if (cancelled) return;
+          if (!invitation) throw new Error("Invitation not available");
+          store.setAlbum([]);
+          store.setWorld({ kind: "wedding", invitation });
+          store.setViewer(viewer, invitation.title);
+          store.setExhibits("ready", assignExhibits(weddingFrameSlots(invitation.setting, photos.length), photos), 0);
+          const wishes = await api<{ entries: GuestbookEntryView[] }>("/api/guestbook").catch(() => null);
+          if (!cancelled && wishes) store.setGuestbook(wishes.entries);
+          return;
+        }
+
+        // A museum: the admins' own, or a museum world someone created (its
+        // photos, an empty Album Kata and its own guest book come from the same APIs).
+        store.setWorld({ kind: "museum" });
+        store.setViewer(viewer, me.world?.name);
         const { photos } = await api<{ photos: ExhibitPhoto[] }>("/api/photos");
         const { slots, wingFrames } = frameSlotsFor(photos.length);
         if (!cancelled) store.setExhibits("ready", assignExhibits(slots, photos), wingFrames);

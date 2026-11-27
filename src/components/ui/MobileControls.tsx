@@ -154,7 +154,8 @@ function Joystick() {
 }
 
 function ActionButtons() {
-  const nearby = useGameStore((s) => s.nearby);
+  // Highlighted when something is in reach, or to stand up from a seat.
+  const nearby = useGameStore((s) => s.nearby !== null || s.seatedId !== null);
   const interact = useGameStore((s) => s.interact);
   const [running, setRunning] = useState(input.runToggle);
 

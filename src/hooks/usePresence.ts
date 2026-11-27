@@ -93,7 +93,7 @@ export function usePresence() {
         switch (msg.t) {
           case "welcome":
             remotePeers.clear();
-            for (const p of msg.peers) upsertPeer({ id: p.id, name: p.name, color: p.color, ...(p.guest ? { guest: true } : {}) }, p.s);
+            for (const p of msg.peers) upsertPeer({ id: p.id, name: p.name, color: p.color, ...(p.guest ? { guest: true } : {}), ...(p.couple ? { couple: p.couple } : {}) }, p.s);
             lastSent = null; // announce our position to everyone right away
             syncPeers();
             break;

@@ -4,7 +4,7 @@ import { isAllowed, readSession } from "./auth/session";
 import { base64UrlDecode, base64UrlDecodeText, base64UrlEncode, signValue, verifyValue } from "./crypto";
 import { ConfigError, env, resetEnvCache } from "./env";
 import { DriveClient, takenAtFor, type DriveFile } from "./google/drive";
-import { buildAuthUrl, createPkce, identityFromIdToken } from "./google/oauth";
+import { buildAuthUrl, DRIVE_FILE_SCOPE, createPkce, identityFromIdToken } from "./google/oauth";
 import { clearServiceAccountCache, serviceAccountToken } from "./google/serviceAccount";
 import { rowToValues, SheetsClient, valuesToRow } from "./google/sheets";
 import { assertSameOrigin } from "./http";
@@ -98,6 +98,15 @@ describe("Sign in with Google", () => {
     expect(url.searchParams.get("redirect_uri")).toBe(cfg.redirectUri);
   });
 
+  it("asks for drive.file only (never the whole Drive) when making an invitation folder", async () => {
+    const p = await createPkce();
+    const url = new URL(buildAuthUrl(cfg, p, { extraScopes: [DRIVE_FILE_SCOPE], loginHint: "me@gmail.com" }));
+    expect(url.searchParams.get("scope")).toBe("openid email profile https://www.googleapis.com/auth/drive.file");
+    expect(url.searchParams.get("login_hint")).toBe("me@gmail.com");
+    expect(url.searchParams.get("include_granted_scopes")).toBe("true");
+    expect(url.searchParams.get("prompt")).toBeNull();
+  });
+
   it("validates issuer, audience, expiry, nonce and verified email", () => {
     expect(identityFromIdToken(idToken(good), cfg.clientId, "n1", 0)).toEqual({ email: "me@gmail.com", name: "Me", picture: null });
     expect(() => identityFromIdToken(idToken({ ...good, aud: "other" }), cfg.clientId, "n1", 0)).toThrow();
@@ -129,7 +138,7 @@ describe("service account", () => {
     const [h, b, s] = assertion.split(".");
     const claims = JSON.parse(base64UrlDecodeText(b!)) as Record<string, unknown>;
     expect(claims).toMatchObject({ iss: cfg.email, aud: "https://oauth2.googleapis.com/token" });
-    expect(String(claims.scope)).toContain("drive.readonly");
+    expect(String(claims.scope)).toContain("auth/drive");
     const key = await crypto.subtle.importKey("spki", publicKey.export({ type: "spki", format: "der" }), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
     const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, base64UrlDecode(s!), new TextEncoder().encode(`${h}.${b}`));
     expect(ok).toBe(true);

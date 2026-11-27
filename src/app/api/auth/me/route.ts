@@ -1,16 +1,23 @@
+import { getSignedInUser, isAdmin } from "@/server/auth/session";
 import { getViewer } from "@/server/auth/viewer";
 import { handler, json } from "@/server/http";
-import { worldSettings } from "@/server/photos/service";
 
-/** Who is here: the signed-in owner, a keyword visitor, or nobody — and, for them, the museum's name. */
+/**
+ * Who is here and where: the signed-in Google account (if any), the world
+ * they are in (museum or invitation) and their role there.
+ */
 export const GET = handler(async () => {
-  const viewer = await getViewer();
-  const world = viewer ? await worldSettings().catch(() => null) : null;
+  const [viewer, user] = await Promise.all([getViewer(), getSignedInUser()]);
+  const world = !viewer
+    ? null
+    : viewer.world.kind === "museum"
+      ? { kind: "museum" as const, name: viewer.world.name }
+      : { kind: "invitation" as const, theme: viewer.world.invitation.theme, name: viewer.world.invitation.title, keyword: viewer.world.invitation.keyword };
   return json(
     {
-      user: viewer?.role === "owner" ? viewer.user : null,
-      visitor: viewer?.role === "visitor" ? { name: viewer.name } : null,
-      world: world ? { name: world.name } : null,
+      user: user ? { ...user, admin: isAdmin(user.email) } : null,
+      viewer: viewer ? { role: viewer.role, name: viewer.name } : null,
+      world,
     },
     { headers: { "cache-control": "no-store" } },
   );

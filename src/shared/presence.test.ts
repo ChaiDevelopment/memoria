@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { base64UrlEncode, signValue } from "@/server/crypto";
 import { remotePeers, sampleAt, upsertPeer, pushState } from "@/systems/presence/remotePeers";
 import { authorize } from "./presenceAuth";
-import { colorIndexFor, displayName, parseClientMessage, sanitizeState, SWEATER_COLORS, stateChanged, type PeerState } from "./presence";
+import { chosenName, colorIndexFor, displayName, parseClientMessage, sanitizeState, SWEATER_COLORS, stateChanged, type PeerState } from "./presence";
 
 const state: PeerState = { x: 1, y: 0, z: 2, f: 0.5, a: "walk", v: 3, vy: 0 };
 
@@ -37,6 +37,8 @@ describe("presence protocol", () => {
     expect(displayName("Ayu Lestari", "ayu@gmail.com")).toBe("Ayu");
     expect(displayName(null, "rico.tp@gmail.com")).toBe("rico.tp");
     expect(displayName("   ", "x@y.z")).toBe("x");
+    expect(chosenName("  Pak   Budi ", "g@visitor.memora")).toBe("Pak Budi");
+    expect(chosenName("", "g@visitor.memora")).toBe("g");
   });
 
   it("only re-sends when something visibly changed", () => {

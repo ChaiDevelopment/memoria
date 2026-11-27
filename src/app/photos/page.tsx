@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Our memories — MEMORA" };
 export const dynamic = "force-dynamic";
 
 export default async function PhotosPage() {
-  const { user, configError } = await pageUser();
+  const { user, signedIn, configError } = await pageUser();
   if (configError) {
     return (
       <AccountShell>
@@ -19,7 +19,8 @@ export default async function PhotosPage() {
       </AccountShell>
     );
   }
-  if (!user) redirect("/login?next=/photos");
+  // Signed in, but not a museum admin: their place is their invitations.
+  if (!user) redirect(signedIn ? "/invitations" : "/login?next=/photos");
   const folderId = rawEnv("DRIVE_FOLDER_ID") ?? "";
 
   return (

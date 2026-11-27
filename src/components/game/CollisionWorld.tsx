@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { InstanceTransform } from "@/lib/geometry";
 import { useGameStore } from "@/stores/gameStore";
-import type { WorldData } from "@/systems/world/buildWorld";
+import type { PlayWorld } from "@/systems/world/playWorld";
 import { Instanced } from "./environment/Instanced";
 
 /**
@@ -12,13 +12,13 @@ import { Instanced } from "./environment/Instanced";
  * by the movement and camera systems. This component only visualises them
  * when "Show colliders" is enabled in Settings → Developer.
  */
-export function CollisionWorld({ world }: { world: WorldData }) {
+export function CollisionWorld({ world }: { world: PlayWorld }) {
   const visible = useGameStore((s) => s.debugColliders);
   if (!visible) return null;
   return <ColliderDebugView world={world} />;
 }
 
-function ColliderDebugView({ world }: { world: WorldData }) {
+function ColliderDebugView({ world }: { world: PlayWorld }) {
   const resources = useMemo(
     () => ({
       box: new THREE.BoxGeometry(1, 1, 1),

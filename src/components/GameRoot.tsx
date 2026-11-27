@@ -15,12 +15,13 @@ import { LiftMenu } from "./ui/LiftMenu";
 import { MobileControls } from "./ui/MobileControls";
 import { SettingsMenu } from "./ui/SettingsMenu";
 import { TitleScreen } from "./ui/TitleScreen";
+import { WeddingPanels } from "./ui/WeddingPanels";
 
 // The Three.js bundle is split out and loaded on demand.
 const GameCanvas = dynamic(() => import("./game/GameCanvas"), { ssr: false });
 
 /** Client-only game shell: 3D canvas + layered UI + input wiring. */
-export default function GameRoot({ initialKeyword }: { initialKeyword?: string }) {
+export default function GameRoot({ initialKeyword, initialName }: { initialKeyword?: string; initialName?: string }) {
   const surface = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
@@ -40,7 +41,8 @@ export default function GameRoot({ initialKeyword }: { initialKeyword?: string }
         <AlbumBook />
         <SettingsMenu />
         <GuestbookPanel />
-        <TitleScreen ready={ready} initialKeyword={initialKeyword} />
+        <WeddingPanels />
+        <TitleScreen ready={ready} initialKeyword={initialKeyword} initialName={initialName} />
       </GameErrorBoundary>
     </div>
   );

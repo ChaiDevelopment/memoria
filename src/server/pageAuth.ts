@@ -1,16 +1,16 @@
 import "server-only";
-import { getCurrentUser, type SessionUser } from "./auth/session";
+import { getCurrentUser, getSignedInUser, type SessionUser } from "./auth/session";
 import { ConfigError } from "./env";
 
 /**
  * For server-rendered pages: resolves the user, but turns a missing server
  * configuration into a friendly setup message instead of an error page.
  */
-export async function pageUser(): Promise<{ user: SessionUser | null; configError: string | null }> {
+export async function pageUser(): Promise<{ user: SessionUser | null; signedIn: SessionUser | null; configError: string | null }> {
   try {
-    return { user: await getCurrentUser(), configError: null };
+    return { user: await getCurrentUser(), signedIn: await getSignedInUser(), configError: null };
   } catch (err) {
-    if (err instanceof ConfigError) return { user: null, configError: err.message };
+    if (err instanceof ConfigError) return { user: null, signedIn: null, configError: err.message };
     throw err;
   }
 }

@@ -18,7 +18,7 @@ export const TOKEN_TTL_MS = 60_000;
 export const PING_MESSAGE = "ping";
 export const PONG_MESSAGE = "pong";
 
-export const PEER_ANIMATIONS = ["idle", "walk", "run", "jump", "inspect"] as const;
+export const PEER_ANIMATIONS = ["idle", "walk", "run", "jump", "inspect", "sit"] as const;
 export type PeerAnimation = (typeof PEER_ANIMATIONS)[number];
 
 export interface PeerState {
@@ -38,6 +38,8 @@ export interface PeerInfo {
   name: string;
   /** Joined with the museum keyword (not an owner). */
   guest?: boolean;
+  /** One of the couple in a wedding invitation (wears the wedding outfit). */
+  couple?: "bride" | "groom";
   /** Index into SWEATER_COLORS. */
   color: number;
 }
@@ -59,6 +61,8 @@ export interface PresenceTokenClaims {
   exp: number;
   /** A keyword visitor rather than an owner. */
   guest?: boolean;
+  /** The bride or groom of the invitation whose room this is. */
+  couple?: "bride" | "groom";
 }
 
 /** Friends' sweaters (the local player keeps the signature mustard). */
@@ -79,6 +83,12 @@ export function displayName(name: string | null | undefined, email: string): str
   const first = name?.trim().split(/\s+/)[0];
   const base = first || email.split("@")[0] || "Visitor";
   return base.slice(0, 20);
+}
+
+/** Guests and couples typed their own name ("Pak Budi"): keep all of it, not just the first word. */
+export function chosenName(name: string | null | undefined, email: string): string {
+  const full = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 24);
+  return full || displayName(null, email);
 }
 
 const finite = (v: unknown, min: number, max: number): number | null =>

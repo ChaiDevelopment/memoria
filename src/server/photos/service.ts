@@ -10,7 +10,7 @@ import { SheetsClient } from "../google/sheets";
 import { ApiError } from "../http";
 import { mergeLibrary, type LibraryPhoto } from "./library";
 
-async function clients() {
+export async function clients() {
   const e = env();
   const token = await serviceAccountToken({ email: e.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKeyPem: e.GOOGLE_SERVICE_ACCOUNT_KEY });
   return { drive: new DriveClient(token), sheets: new SheetsClient(token, e.SHEET_ID), folderId: e.DRIVE_FOLDER_ID };
@@ -23,15 +23,16 @@ async function clients() {
  * per file. Cached thumbnail links also save one Google call per image.
  */
 const FOLDER_CACHE_MS = 5 * 60_000;
-let folderCache: { folderId: string; at: number; files: Map<string, DriveFile> } | null = null;
+const folderCache = new Map<string, { at: number; files: Map<string, DriveFile> }>();
 
-async function folderFiles(drive: DriveClient, folderId: string, force = false): Promise<Map<string, DriveFile>> {
-  if (!force && folderCache && folderCache.folderId === folderId && Date.now() - folderCache.at < FOLDER_CACHE_MS) {
-    return folderCache.files;
-  }
+export async function folderFiles(drive: DriveClient, folderId: string, force = false): Promise<Map<string, DriveFile>> {
+  const hit = folderCache.get(folderId);
+  if (!force && hit && Date.now() - hit.at < FOLDER_CACHE_MS) return hit.files;
   const files = await drive.listFolderImages(folderId);
-  folderCache = { folderId, at: Date.now(), files: new Map(files.map((f) => [f.id, f])) };
-  return folderCache.files;
+  if (folderCache.size > 200) folderCache.clear();
+  const entry = { at: Date.now(), files: new Map(files.map((f) => [f.id, f])) };
+  folderCache.set(folderId, entry);
+  return entry.files;
 }
 
 /** The museum's public settings (keyword, name, published), cached briefly. */

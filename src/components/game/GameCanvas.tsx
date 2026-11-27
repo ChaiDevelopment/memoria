@@ -7,6 +7,7 @@ import { CAMERA } from "@/config/gameConfig";
 import { gameStore, useGameStore } from "@/stores/gameStore";
 import { remotePeers, setLocalRuntime } from "@/systems/presence/remotePeers";
 import { createPlayerRuntime } from "@/systems/runtime";
+import { getWeddingWorld } from "@/systems/world/buildWedding";
 import { getWorld } from "@/systems/world/buildWorld";
 import type { QualityLevel } from "@/types/game";
 import { Lighting } from "./Lighting";
@@ -15,6 +16,7 @@ import { Player } from "./Player";
 import { PlayerController } from "./PlayerController";
 import { RemotePlayers } from "./RemotePlayers";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
+import { WeddingVenue } from "./wedding/WeddingVenue";
 
 const DPR: Record<QualityLevel, [number, number]> = {
   low: [0.75, 1],
@@ -40,7 +42,20 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
   // The world grows Memory Rooms when the visitor has more photos than frames.
   const wingFrames = useGameStore((s) => s.wingFrames);
   const albumChapters = useGameStore((s) => s.album.length);
-  const world = useMemo(() => getWorld(wingFrames, albumChapters), [wingFrames, albumChapters]);
+  const museum = useMemo(() => getWorld(wingFrames, albumChapters), [wingFrames, albumChapters]);
+  // A wedding invitation replaces the museum with its venue (garden or ballroom).
+  const theme = useGameStore((s) => s.world);
+  const photoCount = useGameStore((s) => Object.keys(s.exhibits).length);
+  const wedding = useMemo(() => (theme.kind === "wedding" ? getWeddingWorld(theme.invitation.setting, photoCount) : null), [theme, photoCount]);
+  const world = wedding ?? museum;
+
+  // Entering another world: start at its entrance.
+  const spawnKey = wedding ? `wedding:${wedding.setting}` : "museum";
+  useEffect(() => {
+    const sp = world.spawn;
+    gameStore.setState({ pendingTeleport: { x: sp.x, y: sp.y, z: sp.z, facing: sp.facing } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spawnKey]);
 
   // Let the multiplayer connection read the local player's position.
   useEffect(() => {
@@ -73,11 +88,11 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
       }}
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
-      <color attach="background" args={["#e6dccb"]} />
+      <color attach="background" args={[wedding ? (wedding.setting === "indoor" ? "#2a2018" : "#f1d9c2") : "#e6dccb"]} />
       <Suspense fallback={null}>
-        <MuseumWorld world={world} quality={quality} />
+        {wedding && theme.kind === "wedding" ? <WeddingVenue world={wedding} invitation={theme.invitation} quality={quality} /> : <MuseumWorld world={museum} quality={quality} />}
       </Suspense>
-      <Lighting runtime={runtime} quality={quality} />
+      <Lighting runtime={runtime} quality={quality} theme={wedding ? wedding.setting : "museum"} />
       <PlayerController runtime={runtime} world={world} />
       <Player runtime={runtime} blobShadow={quality === "low"} />
       <RemotePlayers />

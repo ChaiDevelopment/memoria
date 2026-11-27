@@ -8,7 +8,7 @@ import { listAlbum } from "@/server/photos/service";
  */
 export const GET = handler(async () => {
   const viewer = await getViewer();
-  if (!viewer) return json({ chapters: [] }, { headers: { "cache-control": "private, no-store" } });
+  if (!viewer || viewer.world.kind !== "museum") return json({ chapters: [] }, { headers: { "cache-control": "private, no-store" } });
   const chapters = await listAlbum();
   return json(
     {

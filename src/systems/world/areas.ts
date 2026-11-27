@@ -1,4 +1,5 @@
 import { AREAS } from "@/config/museumLayout";
+import { WEDDING_AREAS } from "./buildWedding";
 import type { AreaDef } from "@/types/world";
 
 /**
@@ -17,7 +18,7 @@ export function areaAt(x: number, z: number, areas: readonly AreaDef[] = AREAS, 
 /** Display name + subtitle for an area id (including Memory Rooms). */
 export function areaInfo(id: string | null): { name: string; subtitle: string } | null {
   if (!id) return null;
-  const fixed = AREAS.find((a) => a.id === id);
+  const fixed = AREAS.find((a) => a.id === id) ?? WEDDING_AREAS.find((a) => a.id === id);
   if (fixed) return { name: fixed.name, subtitle: fixed.subtitle };
   if (id === "atrium") return { name: "Grand Atrium", subtitle: "Every memory deserves a place" };
   if (id === "rooftop") return { name: "Rooftop Café", subtitle: "Coffee above the clouds" };
