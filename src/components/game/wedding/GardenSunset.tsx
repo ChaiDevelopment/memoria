@@ -10,7 +10,9 @@ import type { InvitationView } from "@/stores/gameStore";
 import { CHAIR_ROWS, GARDEN, LIGHT_POLES, rowChairXs, STAGE, THRONES, VENUE } from "@/systems/world/buildWedding";
 import type { QualityLevel } from "@/types/game";
 import { Instanced } from "../environment/Instanced";
+import { ASSET, GlbInstances, GlbModel } from "../assets/glb";
 import { rng, useDisposable, type VenueKit } from "./venueKit";
+import { welcomeSignTexture } from "./weddingTextures";
 
 const HEDGE_GREENS = ["#4f7d43", "#5b8a4c", "#47733d", "#66945a"];
 const BLOOMS = ["#f3b6c0", "#ffffff", "#f7d9c4", "#e78a9a", "#fbe7a1"];
@@ -20,7 +22,7 @@ const BLOOMS = ["#f3b6c0", "#ffffff", "#f7d9c4", "#e78a9a", "#fbe7a1"];
  * hedges, trees, distant hills, a wooden pergola over the deck with flowing
  * fabric, natural wooden chairs, a fountain, benches and lanterns.
  */
-export function GardenSunset({ kit, quality }: { kit: VenueKit; quality: QualityLevel; invitation: InvitationView }) {
+export function GardenSunset({ kit, quality, invitation }: { kit: VenueKit; quality: QualityLevel; invitation: InvitationView }) {
   const { m, g } = kit;
   const low = quality === "low";
   const grass = useDisposable(() => {
@@ -165,109 +167,110 @@ export function GardenSunset({ kit, quality }: { kit: VenueKit; quality: Quality
     return { bushes, hedgeFlowers, trunks, crowns, hills, seats, legs, backs, rails, rafters, pergolaFlowers, pleats, bulbs, pavers };
   }, [low]);
 
-  const top = GARDEN.pergolaHeight;
   const f = GARDEN.fountain;
+  const glb = useMemo(() => {
+    const r = rng(9);
+    // Guest chairs face the pelaminan (-z).
+    const chairs: InstanceTransform[] = [];
+    for (const z of CHAIR_ROWS) for (const sgn of [-1, 1]) for (const x of rowChairXs()) chairs.push({ x: sgn * x, y: 0, z, rotationY: Math.PI });
+    // Flowering hedge modules (2,2 m) around the venue; the sides face inwards.
+    const hedges: InstanceTransform[] = [];
+    for (let z = VENUE.minZ + 1.1; z < VENUE.maxZ; z += 2.15) {
+      hedges.push({ x: VENUE.minX - 0.55, y: 0, z, rotationY: Math.PI / 2 });
+      hedges.push({ x: VENUE.maxX + 0.55, y: 0, z, rotationY: -Math.PI / 2 });
+    }
+    for (let x = VENUE.minX + 1.1; x < VENUE.maxX; x += 2.15) {
+      hedges.push({ x, y: 0, z: VENUE.minZ - 0.55, rotationY: 0 });
+      if (Math.abs(x) > 2.5) hedges.push({ x, y: 0, z: VENUE.maxZ + 0.55, rotationY: Math.PI });
+    }
+    // Trees: the four inside the hedges plus a ring of woodland beyond them.
+    const trees: InstanceTransform[][] = [[], [], []];
+    GARDEN.trees.forEach((t, i) => trees[i % 3]!.push({ x: t.x, y: 0, z: t.z, rotationY: i * 1.7, sx: t.s * 0.9, sy: t.s * 0.9, sz: t.s * 0.9 }));
+    for (let i = 0; i < (low ? 14 : 30); i++) {
+      const a = r() * Math.PI * 2;
+      const dist = 26 + r() * 24;
+      const sc = 1 + r() * 0.6;
+      trees[i % 3]!.push({ x: Math.cos(a) * dist, y: 0, z: 3 + Math.sin(a) * dist * 1.15, rotationY: r() * 6, sx: sc, sy: sc, sz: sc });
+    }
+    // Stone path from the entrance to the flower arch (2 m tiles).
+    const path: InstanceTransform[] = [];
+    for (let z = 18.5; z <= 26.5; z += 2) for (const x of [-1, 1]) path.push({ x, y: 0.005, z });
+    // String lights: rows across the aisle, and runs between the rows along both sides.
+    const rows = [...new Set(LIGHT_POLES.map((p) => p.z))];
+    const lightsAcross = rows.map((z) => ({ x: 0, y: 3.45, z }));
+    const lightsAlong: InstanceTransform[] = [];
+    for (let i = 0; i < rows.length - 1; i++) for (const x of [-8.5, 8.5]) lightsAlong.push({ x, y: 3.45, z: (rows[i]! + rows[i + 1]!) / 2, rotationY: Math.PI / 2, sx: (rows[i + 1]! - rows[i]!) / 17, sy: 1, sz: 1 });
+    return {
+      chairs,
+      hedges,
+      trees,
+      path,
+      lightsAcross,
+      lightsAlong,
+      lamps: LIGHT_POLES.map((p) => ({ x: p.x, y: 0, z: p.z })),
+      lanterns: GARDEN.lanterns.map((l) => ({ x: l.x, y: 0, z: l.z })),
+      thrones: THRONES.map((t) => ({ x: t.x, y: STAGE.height, z: t.z })),
+      benches: GARDEN.benches.map((b, i) => ({ x: b.x, y: 0, z: b.z, rotationY: i === 0 ? 0 : Math.PI })),
+    };
+  }, [low]);
+
   return (
     <group name="garden-sunset">
-      <Sky distance={4500} sunPosition={[-60, 5, -90]} turbidity={8} rayleigh={2.8} mieCoefficient={0.009} mieDirectionalG={0.9} />
+      {/* A low sun over the hills: orange and pink, like golden hour. */}
+      <Sky distance={4500} sunPosition={[-40, 2.2, -100]} turbidity={10} rayleigh={3.6} mieCoefficient={0.012} mieDirectionalG={0.92} />
       <mesh geometry={g.plane} material={grassMat} rotation={[-Math.PI / 2, 0, 0]} scale={[260, 260, 1]} receiveShadow />
       <Instanced geometry={g.crown} material={m.white} items={d.hills} castShadow={false} receiveShadow={false} />
+      <GlbModel url={ASSET.garden("mountains-backdrop")} position={[0, -2, -210]} />
 
-      {/* Rolling, flowering hedges and trees. */}
-      <Instanced geometry={g.bush} material={m.white} items={d.bushes} />
+      {/* Flowering hedges, flower beds at their foot, and trees. */}
+      <GlbInstances url={ASSET.garden("hedge-flower")} items={glb.hedges} castShadow={false} />
       <Instanced geometry={g.flower} material={m.white} items={d.hedgeFlowers} castShadow={false} />
-      <Instanced geometry={g.cylinderLow} material={m.bark} items={d.trunks} />
-      <Instanced geometry={g.crown} material={m.white} items={d.crowns} />
+      <GlbInstances url={ASSET.garden("tree-large")} items={glb.trees[0]!} />
+      <GlbInstances url={ASSET.garden("tree-large-2")} items={glb.trees[1]!} />
+      <GlbInstances url={ASSET.garden("tree-large-3")} items={glb.trees[2]!} />
 
-      {/* Pergola over a wooden deck. */}
-      <mesh geometry={g.box} material={deckMat} position={[0, STAGE.height / 2, (STAGE.minZ + STAGE.maxZ) / 2]} scale={[STAGE.maxX - STAGE.minX, STAGE.height, STAGE.maxZ - STAGE.minZ]} castShadow receiveShadow />
-      <mesh geometry={g.box} material={m.woodDark} position={[0, STAGE.height / 2, STAGE.maxZ + 0.01]} scale={[STAGE.maxX - STAGE.minX + 0.04, STAGE.height + 0.02, 0.06]} />
-      {GARDEN.pergolaPosts.map((p, i) => (
-        <group key={i} position={[p.x, STAGE.height, p.z]}>
-          <mesh geometry={g.box} material={m.wood} position={[0, (top - STAGE.height) / 2, 0]} scale={[0.26, top - STAGE.height, 0.26]} castShadow />
-          <mesh geometry={g.box} material={m.woodDark} position={[0, 0.12, 0]} scale={[0.4, 0.24, 0.4]} />
-        </group>
-      ))}
-      {[-15.1, -19.1].map((z) => (
-        <mesh key={z} geometry={g.box} material={m.wood} position={[0, top, z]} scale={[9.6, 0.24, 0.22]} castShadow />
-      ))}
-      {[-4.3, 4.3].map((x) => (
-        <mesh key={x} geometry={g.box} material={m.wood} position={[x, top - 0.02, -17.1]} scale={[0.2, 0.2, 4.8]} castShadow />
-      ))}
-      <Instanced geometry={g.box} material={m.woodLight} items={d.rafters} />
-      {/* Pleated white drapes at the front posts, gold tie-backs; the garden shows through behind. */}
-      <Instanced geometry={g.cylinderLow} material={m.fabric} items={d.pleats} />
-      {[-1, 1].map((s) => (
-        <mesh key={s} geometry={g.box} material={m.gold} position={[s * 3.85, STAGE.height + 1.2, -14.9]} scale={[0.6, 0.05, 0.08]} />
-      ))}
-      {/* Round wooden arch behind the thrones, wreathed in roses. */}
-      <mesh geometry={g.ring} material={m.woodLight} position={[0, STAGE.height + 2.05, -18.9]} scale={1.75} />
-      {[-1, 1].map((s) => (
-        <mesh key={`leg${s}`} geometry={g.box} material={m.woodLight} position={[s * 1.2, (STAGE.height + 0.75) / 2, -18.9]} scale={[0.08, 0.9, 0.08]} />
-      ))}
-      <Instanced geometry={g.flower} material={m.white} items={d.pergolaFlowers} />
-      {/* Carved wooden thrones with cream cushions. */}
-      {THRONES.map((t) => (
-        <group key={t.x} position={[t.x, STAGE.height, t.z]}>
-          {[-0.3, 0.3].map((lx) => [-0.28, 0.28].map((lz) => <mesh key={`${lx}${lz}`} geometry={g.box} material={m.woodDark} position={[lx, 0.22, lz]} scale={[0.07, 0.44, 0.07]} />))}
-          <mesh geometry={g.box} material={m.wood} position={[0, 0.46, 0]} scale={[0.74, 0.08, 0.68]} castShadow />
-          <mesh geometry={g.box} material={m.satin} position={[0, 0.53, 0.02]} scale={[0.62, 0.08, 0.58]} />
-          <mesh geometry={g.box} material={m.wood} position={[0, 1.0, -0.31]} scale={[0.74, 1.0, 0.07]} castShadow />
-          <mesh geometry={g.halfDisc} material={m.wood} position={[0, 1.5, -0.31]} scale={[0.37, 0.3, 1]} />
-          <mesh geometry={g.box} material={m.satin} position={[0, 0.98, -0.27]} scale={[0.56, 0.72, 0.03]} />
-        </group>
-      ))}
+      {/* The pelaminan: wooden deck under the pergola, with the couple's chairs. */}
+      <GlbModel url={ASSET.garden("wedding-deck")} position={[0, 0, (STAGE.minZ + STAGE.maxZ) / 2]} />
+      <GlbModel url={ASSET.garden("pergola")} position={[0, STAGE.height, -17.1]} />
+      <GlbInstances url={ASSET.garden("throne-wood")} items={glb.thrones} />
 
-      {/* Wooden chairs. */}
-      <Instanced geometry={g.box} material={m.wood} items={d.seats} />
-      <Instanced geometry={g.box} material={m.woodDark} items={d.legs} castShadow={false} />
-      <Instanced geometry={g.box} material={m.wood} items={d.backs} castShadow={false} />
-      <Instanced geometry={g.box} material={m.woodDark} items={d.rails} />
+      {/* Guests' chairs, string lights on garden lamp posts, lanterns along the aisle. */}
+      <GlbInstances url={ASSET.garden("chair-wood")} items={glb.chairs} castShadow={!low} />
+      <GlbInstances url={ASSET.garden("lamp-post")} items={glb.lamps} />
+      <GlbInstances url={ASSET.garden("string-lights")} items={glb.lightsAcross} castShadow={false} />
+      <GlbInstances url={ASSET.garden("string-lights")} items={glb.lightsAlong} castShadow={false} />
+      <GlbInstances url={ASSET.garden("lantern-ground")} items={glb.lanterns} castShadow={false} />
 
-      {/* String lights on wooden posts. */}
-      {LIGHT_POLES.map((p, i) => (
-        <group key={i} position={[p.x, 0, p.z]}>
-          <mesh geometry={g.box} material={m.wood} position={[0, 1.8, 0]} scale={[0.12, 3.6, 0.12]} castShadow />
-          <mesh geometry={g.box} material={m.woodDark} position={[0, 3.62, 0]} scale={[0.2, 0.08, 0.2]} />
-        </group>
-      ))}
-      <Instanced geometry={g.bulb} material={m.bulb} items={d.bulbs} castShadow={false} receiveShadow={false} />
+      <WelcomeSign groom={invitation.groomName} bride={invitation.brideName} />
 
-      {/* Stone pavers, fountain, benches, lanterns. */}
-      <Instanced geometry={g.stoneSlab} material={m.white} items={d.pavers} castShadow={false} />
-      <group position={[f.x, 0, f.z]}>
-        <mesh geometry={g.cylinder} material={m.stone} position={[0, 0.3, 0]} scale={[f.radius, 0.6, f.radius]} castShadow receiveShadow />
-        <mesh geometry={g.cylinder} material={m.water} position={[0, 0.58, 0]} scale={[f.radius - 0.14, 0.04, f.radius - 0.14]} />
-        <mesh geometry={g.cylinder} material={m.stone} position={[0, 1.1, 0]} scale={[0.22, 1.2, 0.22]} castShadow />
-        <mesh geometry={g.cone} material={m.stone} position={[0, 1.78, 0]} rotation={[Math.PI, 0, 0]} scale={[0.75, 0.3, 0.75]} castShadow />
-        <mesh geometry={g.cylinder} material={m.water} position={[0, 1.92, 0]} scale={[0.66, 0.03, 0.66]} />
-        <mesh geometry={g.cylinder} material={m.stone} position={[0, 2.1, 0]} scale={[0.08, 0.36, 0.08]} />
-        <mesh geometry={g.orb} material={m.water} position={[0, 2.3, 0]} scale={0.09} />
-      </group>
-      {GARDEN.benches.map((b, i) => (
-        <group key={i} position={[b.x, 0, b.z]} rotation={[0, i === 0 ? 0 : Math.PI, 0]}>
-          {[-0.75, 0.75].map((x) => (
-            <mesh key={x} geometry={g.box} material={m.wire} position={[x, 0.22, 0]} scale={[0.06, 0.44, 0.5]} />
-          ))}
-          {[-0.16, 0, 0.16].map((z) => (
-            <mesh key={z} geometry={g.box} material={m.wood} position={[0, 0.45, z]} scale={[1.8, 0.05, 0.13]} castShadow />
-          ))}
-          {[0.62, 0.8].map((y) => (
-            <mesh key={y} geometry={g.box} material={m.wood} position={[0, y, -0.26]} scale={[1.8, 0.1, 0.04]} />
-          ))}
-        </group>
-      ))}
-      {GARDEN.lanterns.map((l, i) => (
-        <group key={i} position={[l.x, 0, l.z]}>
-          <mesh geometry={g.box} material={m.wire} position={[0, 0.2, 0]} scale={[0.2, 0.36, 0.2]} />
-          <mesh geometry={g.box} material={m.flame} position={[0, 0.2, 0]} scale={[0.15, 0.28, 0.15]} />
-          <mesh geometry={g.cone} material={m.wire} position={[0, 0.44, 0]} scale={[0.17, 0.12, 0.17]} />
-        </group>
-      ))}
+      {/* Entrance: stone path, fountain, benches. */}
+      <GlbInstances url={ASSET.garden("stone-path")} items={glb.path} castShadow={false} />
+      <GlbModel url={ASSET.garden("fountain")} position={[f.x, 0, f.z]} />
+      <GlbInstances url={ASSET.garden("bench-garden")} items={glb.benches} />
 
       {!low && <Fireflies kit={kit} />}
       <GardenLights low={low} />
     </group>
+  );
+}
+
+/** The "Welcome to our Wedding" easel, its blank board painted with the couple's names. */
+function WelcomeSign({ groom, bride }: { groom: string; bride: string }) {
+  const tex = useDisposable(() => welcomeSignTexture(groom, bride), [groom, bride]);
+  const mat = useDisposable(() => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), [tex]);
+  const w = GARDEN.welcomeSign;
+  return (
+    <GlbModel
+      url={ASSET.garden("welcome-sign")}
+      position={[w.x, 0, w.z]}
+      rotationY={0.35}
+      onReady={(root) =>
+        root.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.isMesh && (mesh.name === "content_area" || mesh.parent?.name === "content_area")) mesh.material = mat;
+        })
+      }
+    />
   );
 }
 

@@ -17,6 +17,7 @@ import { PlayerController } from "./PlayerController";
 import { RemotePlayers } from "./RemotePlayers";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { WeddingVenue } from "./wedding/WeddingVenue";
+import { PostFX } from "./PostFX";
 
 const DPR: Record<QualityLevel, [number, number]> = {
   low: [0.75, 1],
@@ -88,6 +89,7 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
       }}
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
+      <WeddingExposure exposure={!wedding ? 1.05 : wedding.setting === "indoor" ? 0.82 : 0.92} />
       <color attach="background" args={[wedding ? (wedding.setting === "indoor" ? "#2a2018" : "#f1d9c2") : "#e6dccb"]} />
       <Suspense fallback={null}>
         {wedding && theme.kind === "wedding" ? <WeddingVenue world={wedding} invitation={theme.invitation} quality={quality} /> : <MuseumWorld world={museum} quality={quality} />}
@@ -97,6 +99,8 @@ export default function GameCanvas({ onReady }: { onReady?: () => void }) {
       <Player runtime={runtime} blobShadow={quality === "low"} />
       <RemotePlayers />
       <ThirdPersonCamera runtime={runtime} world={world} />
+      {/* Trial: illustrated finish in the wedding venues. */}
+      {wedding && <PostFX quality={quality} warm />}
       <DebugThree />
     </Canvas>
   );
@@ -115,5 +119,14 @@ function DebugThree() {
     }, 200);
     return () => clearInterval(id);
   }, [gl, scene]);
+  return null;
+}
+
+/** Golden hour: a slightly lower exposure in the wedding venues keeps whites from washing out. */
+function WeddingExposure({ exposure }: { exposure: number }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
   return null;
 }

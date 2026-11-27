@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CAMERA } from "@/config/gameConfig";
 import { damp } from "@/lib/math";
@@ -9,6 +9,7 @@ import { CharacterAnimator } from "@/systems/animation/characterAnimator";
 import { useGameStore } from "@/stores/gameStore";
 import type { PlayerRuntime } from "@/systems/runtime";
 import { ChatOverhead } from "./ChatOverhead";
+import { GlbCharacter, lookFor } from "./character/GlbCharacter";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
 import type { CharacterModelHandle } from "./character/types";
 
@@ -28,6 +29,8 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   const selfId = useGameStore((s) => s.selfId);
   // The couple wear their wedding outfits in their own invitation's venue.
   const outfit = useGameStore((s) => (s.world.kind !== "wedding" ? "explorer" : s.viewer?.role === "bride" ? "gown" : s.viewer?.role === "groom" ? "suit" : "explorer"));
+  const look = useMemo(() => lookFor(outfit === "gown" ? "bride" : outfit === "suit" ? "groom" : null, 0), [outfit]);
+  const sample = useMemo(() => () => ({ state: runtime.anim.state, speed: runtime.motor.horizontalSpeed }), [runtime]);
 
   // Soft contact shadow, used when real-time shadows are disabled (low quality).
   const blobMaterial = useMemo(() => {
@@ -88,7 +91,10 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   return (
     <>
       <group ref={root} name="player">
-        <ProceduralCharacter ref={model} outfit={outfit} />
+        {/* The rigged character; the simple one shows while it loads. */}
+        <Suspense fallback={<ProceduralCharacter ref={model} outfit={outfit} />}>
+          <GlbCharacter look={look} sample={sample} />
+        </Suspense>
         <ChatOverhead peerId={selfId} height={2.1} />
       </group>
       {blobShadow && (

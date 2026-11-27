@@ -27,7 +27,8 @@ describe("wedding venue", () => {
     expect(framesFor(999, "outdoor")).toHaveLength(MAX_WEDDING_FRAMES);
     expect(buildWeddingWorld("outdoor", 5).interactables.filter((i) => i.kind === "photo")).toHaveLength(5);
     expect(weddingFrameSlots("indoor", 7).map((s) => s.slotId)).toEqual(framesFor(7, "indoor").map((p) => p.memoryId));
-    expect(new Set(framesFor(999, "indoor").map((p) => p.memoryId)).size).toBe(MAX_WEDDING_FRAMES);
+    // The ballroom hangs fewer, larger wall frames (its walls are mostly windows).
+    expect(new Set(framesFor(999, "indoor").map((p) => p.memoryId)).size).toBe(30);
   });
 
   it("puts the info board, envelope and wishes wall within reach", () => {
@@ -54,14 +55,14 @@ describe("wedding venue", () => {
     const garden = buildWeddingWorld("outdoor", 0);
     const ballroom = buildWeddingWorld("indoor", 0);
     const cams = (w: typeof garden) => w.cameraColliders.filter((c) => c.kind === "cylinder").length;
-    // Garden: 4 pergola posts + 4 trees + the fountain's column. Ballroom: 18 pillars.
+    // Garden: 4 pergola posts + 4 trees + the fountain's column. Ballroom: its pilasters are part of the walls.
     expect(cams(garden)).toBe(9);
-    expect(cams(ballroom)).toBe(18);
+    expect(cams(ballroom)).toBe(0);
     // Ballroom stage: two steps of 0.25 m, within the 0.32 m climbing limit.
     const steps = ballroom.colliders.filter((c) => c.kind === "box" && c.minY === 0 && (c.maxY === 0.25 || c.maxY === 0.5));
     expect(steps).toHaveLength(2);
     // The ballroom seats guests at round tables, the garden in rows.
-    expect(ballroom.colliders.filter((c) => c.kind === "cylinder" && Math.abs(c.radius - 1.75) < 1e-9)).toHaveLength(10);
+    expect(ballroom.colliders.filter((c) => c.kind === "cylinder" && Math.abs(c.radius - 1.6) < 1e-9)).toHaveLength(10);
     expect(garden.colliders.filter((c) => c.kind === "box" && c.maxY === 0.95)).toHaveLength(16);
   });
 

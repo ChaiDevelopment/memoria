@@ -59,6 +59,8 @@ export const GARDEN = {
     { x: 13.4, z: 25.0, s: 1.1 },
   ],
   fountain: { x: -10.2, z: 23.6, radius: 1.5 },
+  /** "Welcome to our Wedding" easel by the entrance (faces arriving guests). */
+  welcomeSign: { x: -7.4, z: 18.6 },
   benches: [
     { x: 10.6, z: 22.6 },
     { x: 10.6, z: 25.3 },
@@ -72,23 +74,37 @@ export const GARDEN = {
  * crystal chandeliers.
  */
 export const BALLROOM = {
+  /** The modelled stage (stage-ballroom.glb): a 0,25 m step across the front, the 0,5 m platform behind. */
   stage: [
-    { minX: -6.5, maxX: 6.5, minZ: -19.6, maxZ: -13.4, top: 0.25 },
-    { minX: -4.5, maxX: 4.5, minZ: -19.6, maxZ: -15.8, top: 0.5 },
+    { minX: -8, maxX: 8, minZ: -19.9, maxZ: -12.4, top: 0.25 },
+    { minX: -8, maxX: 8, minZ: -19.9, maxZ: -15.8, top: 0.5 },
   ],
-  wallPillars: [-15.7, -10.5, -5.3, -0.1, 5.1, 10.3, 15.5, 20.7].flatMap((z) => [-15.25, 15.25].map((x) => ({ x, z, r: 0.42 }))),
-  stagePillars: [-7.6, 7.6].map((x) => ({ x, z: -17.2, r: 0.5 })),
+  /** Where stage-ballroom.glb sits (its backdrop at the back wall). */
+  stageAt: { x: 0, z: -16.34 },
+  /** The couple's sofa on the platform (sofa-wedding.glb). */
+  sofa: { x: 0, z: -17.7 },
+  /** ballroom-shell.glb is centred on the venue: x 0, z 3. */
+  shellAt: { x: 0, z: 3 },
+  /** Centres of the tall arched windows on each long wall (curtains hang here). */
+  windows: [-15, -3, 9, 21],
+  /** The blank wall bays between the windows (photo frames hang here). */
+  photoBays: [-9, 3, 15],
+  wallPillars: [] as { x: number; z: number; r: number }[],
+  stagePillars: [] as { x: number; z: number; r: number }[],
   tables: [-9.2, -4.6, 0, 4.6, 9.2].flatMap((z) => [-4.6, 4.6].map((x) => ({ x, z }))),
   tableRadius: 0.9,
-  /** Chairs sit on this ring around each table; the collider covers it. */
-  chairRing: 1.45,
+  /** Chairs sit on this ring around each table (table-round-set.glb); the collider covers it. */
+  chairRing: 1.3,
+  /** Under the ceiling medallions of ballroom-shell.glb. */
   chandeliers: [
-    { x: 0, z: -2, big: true },
-    { x: -6.5, z: -9, big: false },
-    { x: 6.5, z: -9, big: false },
-    { x: -6.5, z: 7, big: false },
-    { x: 6.5, z: 7, big: false },
-    { x: 0, z: 14, big: false },
+    { x: 0, z: 1, big: true },
+    { x: -8, z: 17, big: false },
+    { x: 8, z: 17, big: false },
+    { x: -8, z: 5, big: false },
+    { x: 8, z: 5, big: false },
+    { x: -8, z: -7, big: false },
+    { x: 8, z: -7, big: false },
+    { x: 0, z: 17, big: false },
   ],
 } as const;
 
@@ -125,10 +141,10 @@ export function rowChairXs(): number[] {
   return xs;
 }
 
-/** The eight chairs around a banquet table: position and the angle they sit at. */
+/** The eight chairs around a banquet table (as in table-round-set.glb): position and the angle they sit at. */
 export function tableChairs(t: { x: number; z: number }, ring: number): { x: number; z: number; angle: number }[] {
   return Array.from({ length: 8 }, (_, i) => {
-    const angle = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    const angle = -(i / 8) * Math.PI * 2;
     return { x: t.x + Math.cos(angle) * ring, z: t.z + Math.sin(angle) * ring, angle };
   });
 }
@@ -137,7 +153,9 @@ export function tableChairs(t: { x: number; z: number }, ring: number): { x: num
 export function weddingSeats(setting: WeddingSetting): Seat[] {
   const seats: Seat[] = [];
   const top = stageTop(setting);
-  THRONES.forEach((t, i) => seats.push({ id: `throne-${i}`, x: t.x, z: t.z + 0.02, y: top, facing: 0, exit: { x: t.x, z: t.z + 0.85 }, coupleOnly: true }));
+  // The couple's seats: two thrones in the garden, the sofa in the ballroom.
+  const couple = setting === "indoor" ? [-0.48, 0.48].map((dx) => ({ x: BALLROOM.sofa.x + dx, z: BALLROOM.sofa.z })) : THRONES;
+  couple.forEach((t, i) => seats.push({ id: `throne-${i}`, x: t.x, z: t.z + 0.02, y: top, facing: 0, exit: { x: t.x, z: t.z + 0.85 }, coupleOnly: true }));
   if (setting === "outdoor") {
     // Rows face the pelaminan (-z); step in from the gap in front of the row.
     CHAIR_ROWS.forEach((z, r) => {
@@ -178,13 +196,19 @@ export function weddingPlacements(setting: WeddingSetting): PhotoPlacement[] {
     out.push({ memoryId: id(), x: -11, y: 1.3, z, facing: "+x", height: 0.95, frame: "white", mount: "easel", aspect });
     out.push({ memoryId: id(), x: 11, y: 1.3, z, facing: "-x", height: 0.95, frame: "white", mount: "easel", aspect });
   }
-  // Frames on the perimeter hedges / ballroom walls.
+  // Frames on the garden hedges, or the ballroom's blank wall bays (the rest of its walls are windows).
   const wallX = VENUE.maxX - 0.18;
-  const y = setting === "indoor" ? 2.3 : 1.75;
+  if (setting === "indoor") {
+    for (const z of BALLROOM.photoBays) {
+      out.push({ memoryId: id(), x: -wallX, y: 3.0, z, facing: "+x", height: 1.9, frame: "gold", mount: "wall", aspect: 1.4 });
+      out.push({ memoryId: id(), x: wallX, y: 3.0, z, facing: "-x", height: 1.9, frame: "gold", mount: "wall", aspect: 1.4 });
+    }
+    return out;
+  }
   for (let i = 0; i < 16; i++) {
     const z = -17 + i * 2.6;
-    out.push({ memoryId: id(), x: -wallX, y, z, facing: "+x", height: 1.05, frame: "gold", mount: "wall", aspect: 1.4 });
-    out.push({ memoryId: id(), x: wallX, y, z, facing: "-x", height: 1.05, frame: "gold", mount: "wall", aspect: 1.4 });
+    out.push({ memoryId: id(), x: -wallX, y: 1.75, z, facing: "+x", height: 1.05, frame: "gold", mount: "wall", aspect: 1.4 });
+    out.push({ memoryId: id(), x: wallX, y: 1.75, z, facing: "-x", height: 1.05, frame: "gold", mount: "wall", aspect: 1.4 });
   }
   return out;
 }
@@ -217,10 +241,16 @@ export function buildWeddingWorld(setting: WeddingSetting, photoCount = 0): Wedd
   if (setting === "indoor") colliders.push(box({ minX: VENUE.minX - t, maxX: VENUE.maxX + t, minY: VENUE.ceiling, maxY: VENUE.ceiling + 0.3, minZ: VENUE.minZ - t, maxZ: VENUE.maxZ + t }, true));
 
   // Flower arch posts and the aisle's flower stands (both venues).
-  for (const s of [-1, 1]) colliders.push(cylinder(s * ARCH.halfWidth, ARCH.z, 0.28, 0, ARCH.height));
+  // The flower arch stands in the garden only.
+  if (setting === "outdoor") for (const s of [-1, 1]) colliders.push(cylinder(s * ARCH.halfWidth, ARCH.z, 0.28, 0, ARCH.height));
   for (const f of AISLE_FLOWERS) colliders.push(cylinder(f.x, f.z, 0.22, 0, 1.3));
   const top = stageTop(setting);
-  for (const th of THRONES) colliders.push(box({ minX: th.x - 0.42, maxX: th.x + 0.42, minY: top, maxY: top + 0.6, minZ: th.z - 0.4, maxZ: th.z + 0.4 }, false));
+  if (setting === "indoor") {
+    const s = BALLROOM.sofa;
+    colliders.push(box({ minX: s.x - 1.0, maxX: s.x + 1.0, minY: top, maxY: top + 0.6, minZ: s.z - 0.42, maxZ: s.z + 0.38 }, false));
+  } else {
+    for (const th of THRONES) colliders.push(box({ minX: th.x - 0.42, maxX: th.x + 0.42, minY: top, maxY: top + 0.6, minZ: th.z - 0.4, maxZ: th.z + 0.4 }, false));
+  }
 
   if (setting === "outdoor") {
     // Wooden deck (one step up) under an open pergola — no solid backdrop.
@@ -240,10 +270,12 @@ export function buildWeddingWorld(setting: WeddingSetting, photoCount = 0): Wedd
     colliders.push({ ...cylinder(f.x, f.z, 0.4, 0, 2.3), blocksCamera: true });
     for (const b of GARDEN.benches) colliders.push(box({ minX: b.x - 0.95, maxX: b.x + 0.95, minY: 0, maxY: 0.85, minZ: b.z - 0.3, maxZ: b.z + 0.3 }, false));
     for (const l of GARDEN.lanterns) colliders.push(cylinder(l.x, l.z, 0.13, 0, 0.5));
+    const w = GARDEN.welcomeSign;
+    colliders.push(box({ minX: w.x - 0.65, maxX: w.x + 0.65, minY: 0, maxY: 1.6, minZ: w.z - 0.3, maxZ: w.z + 0.3 }, false));
   } else {
     // Two-level stage (each step 0.25 m, under the climbing limit) and its backdrop.
     for (const lv of BALLROOM.stage) colliders.push(box({ minX: lv.minX, maxX: lv.maxX, minY: 0, maxY: lv.top, minZ: lv.minZ, maxZ: lv.maxZ }, false));
-    colliders.push(box({ minX: -6.5, maxX: 6.5, minY: 0, maxY: 5.2, minZ: STAGE.minZ - 0.6, maxZ: STAGE.minZ }, true));
+    colliders.push(box({ minX: -8, maxX: 8, minY: 0, maxY: 6.2, minZ: -20.6, maxZ: -19.9 }, true));
     for (const p of [...BALLROOM.wallPillars, ...BALLROOM.stagePillars]) colliders.push({ ...cylinder(p.x, p.z, p.r, 0, VENUE.ceiling), blocksCamera: true });
     // Round banquet tables: one collider covers the table and its ring of chairs.
     for (const t of BALLROOM.tables) colliders.push(cylinder(t.x, t.z, BALLROOM.chairRing + 0.3, 0, 1.0));

@@ -1,13 +1,14 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { SWEATER_COLORS, type PeerInfo } from "@/shared/presence";
+import { SWEATER_COLORS, type PeerInfo, type PeerState } from "@/shared/presence";
 import { useGameStore } from "@/stores/gameStore";
 import { CharacterAnimator } from "@/systems/animation/characterAnimator";
 import { INTERP_DELAY_MS, remotePeers, sampleAt } from "@/systems/presence/remotePeers";
 import { ChatOverhead } from "./ChatOverhead";
+import { GlbCharacter, lookFor } from "./character/GlbCharacter";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
 import type { CharacterModelHandle } from "./character/types";
 
@@ -31,6 +32,10 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
   const root = useRef<THREE.Group>(null);
   const model = useRef<CharacterModelHandle>(null);
   const animator = useMemo(() => new CharacterAnimator(), []);
+  // The latest interpolated state, for the rigged character's animation.
+  const last = useRef<{ state: PeerState["a"]; speed: number }>({ state: "idle", speed: 0 });
+  const sample = useMemo(() => () => last.current, []);
+  const look = useMemo(() => lookFor(peer.couple ?? null, peer.color + (peer.guest ? 0 : 3)), [peer.couple, peer.color, peer.guest]);
   const wedding = useGameStore((s) => s.world.kind === "wedding");
   // The couple are labelled (and dressed) as such — the server decides who they are.
   const label = peer.couple ? `${peer.name} · Pengantin` : peer.guest && !wedding ? `${peer.name} · Guest` : peer.name;
@@ -41,6 +46,7 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
     const g = root.current;
     const entry = remotePeers.get(peer.id);
     const s = entry ? sampleAt(entry, performance.now() - INTERP_DELAY_MS) : null;
+    if (s) last.current = { state: s.a, speed: s.v };
     if (!g) return;
     g.visible = s !== null;
     if (!s) return;
@@ -52,7 +58,9 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
 
   return (
     <group ref={root} name={`visitor-${peer.name}`} visible={false}>
-      <ProceduralCharacter ref={model} sweater={SWEATER_COLORS[peer.color % SWEATER_COLORS.length]} outfit={peer.couple === "bride" ? "gown" : peer.couple === "groom" ? "suit" : "explorer"} />
+      <Suspense fallback={<ProceduralCharacter ref={model} sweater={SWEATER_COLORS[peer.color % SWEATER_COLORS.length]} outfit={peer.couple === "bride" ? "gown" : peer.couple === "groom" ? "suit" : "explorer"} />}>
+        <GlbCharacter look={look} sample={sample} />
+      </Suspense>
       <primitive object={tag} position={[0, 2.15, 0]} />
       <ChatOverhead peerId={peer.id} height={2.33} />
     </group>

@@ -100,7 +100,7 @@ export function Lighting({ runtime, quality, theme = "museum" }: { runtime: Play
           <pointLight ref={hallLight} position={[22, 4.2, 21]} color="#ffd9a0" intensity={0} distance={18} decay={1.6} />
         </>
       )}
-      <fog attach="fog" args={museum ? ["#e6dccb", 55, 210] : theme === "outdoor" ? ["#f1d9c2", 45, 160] : ["#2a2018", 40, 90]} />
+      <fog attach="fog" args={museum ? ["#e6dccb", 55, 210] : theme === "outdoor" ? ["#efc3a6", 40, 150] : ["#2a2018", 40, 90]} />
     </>
   );
 }

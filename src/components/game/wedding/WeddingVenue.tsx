@@ -1,5 +1,6 @@
 "use client";
 
+import { useTexture } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
 import type { InstanceTransform } from "@/lib/geometry";
@@ -9,6 +10,7 @@ import type { QualityLevel } from "@/types/game";
 import { CollisionWorld } from "../CollisionWorld";
 import { Instanced } from "../environment/Instanced";
 import { Photographs } from "../environment/Photographs";
+import { ASSET, GlbInstances, GlbModel } from "../assets/glb";
 import { GardenSunset } from "./GardenSunset";
 import { GrandBallroom } from "./GrandBallroom";
 import { rng, useDisposable, useVenueKit, type VenueKit } from "./venueKit";
@@ -72,36 +74,50 @@ function SharedPieces({ kit, invitation, outdoor, quality }: { kit: VenueKit; in
     return { flowers, leaves, petals };
   }, [outdoor, quality]);
 
-  const runner = outdoor ? m.cream : m.burgundy;
+  // The ballroom's runner uses the pack's red carpet with gold borders.
+  const carpetTex = useTexture("/assets/textures/red-carpet.png");
+  const carpetMat = useDisposable(() => {
+    const t = carpetTex.clone();
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1, 15);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
+  }, [carpetTex]);
+  const runner = outdoor ? m.cream : carpetMat;
   return (
     <group name="wedding-shared">
       {/* Aisle runner: cream linen in the garden, burgundy velvet in the ballroom. */}
       <mesh geometry={g.plane} material={runner} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, 2]} scale={[2.2, 33, 1]} receiveShadow />
-      {[-1.12, 1.12].map((x) => (
+      {outdoor && [-1.12, 1.12].map((x) => (
         <mesh key={x} geometry={g.plane} material={m.gold} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.016, 2]} scale={[0.06, 33, 1]} />
       ))}
       <Instanced geometry={g.petal} material={m.petal} items={decor.petals} castShadow={false} />
 
-      {/* Flower arch with the couple's sign. */}
-      {[-1, 1].map((s) => (
+      {/* Flower arch with the couple's sign (the garden uses the modelled arch). */}
+      {outdoor && <GlbModel url={ASSET.shared("flower-arch")} position={[0, 0, ARCH.z]} />}
+      <GlbInstances url={outdoor ? ASSET.shared("flower-stand") : ASSET.ballroom("flower-pedestal")} items={AISLE_FLOWERS.map((f) => ({ x: f.x, y: 0, z: f.z }))} />
+      {false && [-1, 1].map((s) => (
         <mesh key={s} geometry={g.cylinder} material={outdoor ? m.woodLight : m.gold} position={[s * ARCH.halfWidth, (ARCH.height - 1.2) / 2, ARCH.z]} scale={[0.1, ARCH.height - 1.2, 0.1]} castShadow />
       ))}
-      <mesh geometry={g.halfRing} material={outdoor ? m.woodLight : m.gold} position={[0, ARCH.height - 1.2, ARCH.z]} scale={[ARCH.halfWidth, 1.2, 1]} />
-      <mesh geometry={g.plane} material={signMat} position={[0, ARCH.height - 1.55, ARCH.z + 0.02]} scale={[2.6, 0.65, 1]} />
-      <mesh geometry={g.plane} material={signMat} position={[0, ARCH.height - 1.55, ARCH.z - 0.02]} rotation={[0, Math.PI, 0]} scale={[2.6, 0.65, 1]} />
-      {[-1, 1].map((s) => (
-        <mesh key={`r${s}`} geometry={g.box} material={m.gold} position={[s * 1.1, ARCH.height - 1.05, ARCH.z]} scale={[0.015, 0.5, 0.015]} />
-      ))}
+      {outdoor && (
+        <>
+          <mesh geometry={g.plane} material={signMat} position={[0, ARCH.height - 1.55, ARCH.z + 0.02]} scale={[2.6, 0.65, 1]} />
+          <mesh geometry={g.plane} material={signMat} position={[0, ARCH.height - 1.55, ARCH.z - 0.02]} rotation={[0, Math.PI, 0]} scale={[2.6, 0.65, 1]} />
+          {[-1, 1].map((s) => (
+            <mesh key={`r${s}`} geometry={g.box} material={m.gold} position={[s * 1.1, ARCH.height - 1.05, ARCH.z]} scale={[0.015, 0.5, 0.015]} />
+          ))}
+        </>
+      )}
 
-      {AISLE_FLOWERS.map((f, i) => (
+      {false && AISLE_FLOWERS.map((f, i) => (
         <group key={i} position={[f.x, 0, f.z]}>
           <mesh geometry={g.cylinder} material={m.gold} position={[0, 0.5, 0]} scale={[0.045, 1.0, 0.045]} castShadow />
           <mesh geometry={g.cylinder} material={m.gold} position={[0, 0.03, 0]} scale={[0.2, 0.06, 0.2]} />
           <mesh geometry={g.cone} material={m.gold} position={[0, 1.02, 0]} rotation={[Math.PI, 0, 0]} scale={[0.2, 0.16, 0.2]} />
         </group>
       ))}
-      <Instanced geometry={g.flower} material={m.white} items={decor.flowers} />
-      <Instanced geometry={g.flower} material={m.greenery} items={decor.leaves} />
+      {/* (The arch and aisle flowers are modelled assets now in both venues.) */}
 
       {/* Info board (entrance, left). */}
       <group position={[INFO_BOARD.x, 0, INFO_BOARD.z]} rotation={[0, Math.PI / 2, 0]}>

@@ -290,3 +290,30 @@ export function ornateBackdropTexture(groom: string, bride: string): THREE.Canva
   ctx.fillText(`${groom} · ${bride}`, 650, 370);
   return texture(c);
 }
+
+/** The entrance easel: "Welcome to our Wedding" and the couple's names (content area of welcome-sign.glb). */
+export function welcomeSignTexture(groom: string, bride: string): THREE.CanvasTexture {
+  const { c, ctx } = canvas(768, 640);
+  ctx.fillStyle = "#e8cfa9";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#5a3b28";
+  ctx.font = "italic 88px Georgia, serif";
+  ctx.fillText("Welcome", 384, 170);
+  ctx.font = "italic 52px Georgia, serif";
+  ctx.fillText("to our", 384, 250);
+  ctx.font = "italic 88px Georgia, serif";
+  ctx.fillText("Wedding", 384, 350);
+  ornament(ctx, 384, 405, 300);
+  ctx.fillStyle = "#7a5538";
+  let size = 50;
+  const names = `${groom} & ${bride}`;
+  do {
+    ctx.font = `italic ${size}px Georgia, serif`;
+    size -= 2;
+  } while (ctx.measureText(names).width > 640 && size > 24);
+  ctx.fillText(names, 384, 490);
+  ctx.font = "44px Georgia, serif";
+  ctx.fillText("♡", 384, 570);
+  return texture(c);
+}
