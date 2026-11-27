@@ -39,7 +39,7 @@ export interface AlbumChapterView {
   words: string;
   photos: { id: string; thumbUrl: string; url: string }[];
 }
-import type { PeerInfo } from "@/shared/presence";
+import type { ChatEntry, PeerInfo, Reaction } from "@/shared/presence";
 import type { GameSettings, QualityLevel } from "@/types/game";
 import type { AreaId } from "@/types/world";
 
@@ -89,6 +89,14 @@ export interface GameState {
   /** Multiplayer connection state and the other visitors currently in the museum. */
   presence: "off" | "connecting" | "online";
   peers: PeerInfo[];
+  /** This visitor's peer id in the room (to show their own speech bubbles). */
+  selfId: string | null;
+  /** Recent chat in this world (oldest first). */
+  chat: ChatEntry[];
+  /** The chat input is open (typing). */
+  chatOpen: boolean;
+  /** Floating reactions currently shown: one per (peer, time). */
+  reactions: { key: string; id: string; e: Reaction; at: number }[];
   museumName: string;
   settings: GameSettings;
   /** Developer aid: render collision volumes (not persisted). */
@@ -131,6 +139,11 @@ export interface GameState {
   setDebugColliders: (on: boolean) => void;
   setExhibits: (status: GameState["exhibitsStatus"], exhibits?: Record<string, ExhibitPhoto>, wingFrames?: number) => void;
   setPresence: (presence: GameState["presence"], peers?: PeerInfo[]) => void;
+  setSelfId: (id: string | null) => void;
+  addChat: (entries: ChatEntry[], replace?: boolean) => void;
+  addReaction: (id: string, e: Reaction) => void;
+  openChat: () => void;
+  closeChat: () => void;
 }
 
 function defaultQuality(): QualityLevel {
@@ -175,6 +188,10 @@ export const useGameStore = create<GameState>()(
       pointerLocked: false,
       presence: "off",
       peers: [],
+      selfId: null,
+      chat: [],
+      chatOpen: false,
+      reactions: [],
       museumName: "The Museum of Small Moments",
       settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() },
       debugColliders: false,
@@ -249,6 +266,16 @@ export const useGameStore = create<GameState>()(
       resetSettings: () => set({ settings: { ...DEFAULT_SETTINGS, quality: defaultQuality() } }),
       setDebugColliders: (debugColliders) => set({ debugColliders }),
       setPresence: (presence, peers) => set(peers ? { presence, peers } : { presence }),
+      setSelfId: (selfId) => set({ selfId }),
+      addChat: (entries, replace = false) => set({ chat: [...(replace ? [] : get().chat), ...entries].slice(-60) }),
+      addReaction: (id, e) => {
+        const now = Date.now();
+        set({ reactions: [...get().reactions.filter((r) => now - r.at < 2500), { key: `${id}:${now}`, id, e, at: now }] });
+      },
+      openChat: () => {
+        if (get().phase === "playing" && !get().menuOpen) set({ chatOpen: true });
+      },
+      closeChat: () => set({ chatOpen: false }),
       setExhibits: (exhibitsStatus, exhibits, wingFrames) =>
         set({ exhibitsStatus, ...(exhibits ? { exhibits } : {}), ...(wingFrames !== undefined ? { wingFrames } : {}) }),
     }),
@@ -268,6 +295,6 @@ export const useGameStore = create<GameState>()(
 /** Convenience for non-React code (game loop, event handlers). */
 export const gameStore = useGameStore;
 
-export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex" | "guestbookOpen" | "panel">): boolean {
-  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null || s.guestbookOpen || s.panel !== null;
+export function isGameplayBlocked(s: Pick<GameState, "phase" | "menuOpen" | "inspectingId" | "liftMenuOpen" | "albumIndex" | "guestbookOpen" | "panel" | "chatOpen">): boolean {
+  return s.phase !== "playing" || s.menuOpen || s.inspectingId !== null || s.liftMenuOpen || s.albumIndex !== null || s.guestbookOpen || s.panel !== null || s.chatOpen;
 }

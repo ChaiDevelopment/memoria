@@ -74,3 +74,12 @@ export function setLocalRuntime(runtime: PlayerRuntime | null) {
 export function getLocalRuntime(): PlayerRuntime | null {
   return localRuntime;
 }
+
+/** Sends a message on the open presence socket (chat, reactions); false when offline. */
+let sender: ((msg: unknown) => boolean) | null = null;
+export function setPresenceSender(fn: ((msg: unknown) => boolean) | null) {
+  sender = fn;
+}
+export function sendPresence(msg: unknown): boolean {
+  return sender ? sender(msg) : false;
+}

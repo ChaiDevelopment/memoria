@@ -9,6 +9,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { GameErrorBoundary } from "./ui/ErrorBoundary";
 import { GameHUD } from "./ui/GameHUD";
 import { AlbumBook } from "./ui/AlbumBook";
+import { ChatBox } from "./ui/ChatBox";
 import { GuestbookPanel } from "./ui/GuestbookPanel";
 import { InspectOverlay } from "./ui/InspectOverlay";
 import { LiftMenu } from "./ui/LiftMenu";
@@ -36,6 +37,7 @@ export default function GameRoot({ initialKeyword, initialName }: { initialKeywo
         <GameCanvas onReady={onReady} />
         <MobileControls />
         <GameHUD />
+        <ChatBox />
         <InspectOverlay />
         <LiftMenu />
         <AlbumBook />

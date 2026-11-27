@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { base64UrlEncode, signValue } from "@/server/crypto";
 import { remotePeers, sampleAt, upsertPeer, pushState } from "@/systems/presence/remotePeers";
 import { authorize } from "./presenceAuth";
-import { chosenName, colorIndexFor, displayName, parseClientMessage, sanitizeState, SWEATER_COLORS, stateChanged, type PeerState } from "./presence";
+import { chosenName, colorIndexFor, displayName, parseClientMessage, sanitizeChat, sanitizeState, SWEATER_COLORS, stateChanged, type PeerState } from "./presence";
 
 const state: PeerState = { x: 1, y: 0, z: 2, f: 0.5, a: "walk", v: 3, vy: 0 };
 
@@ -13,12 +13,21 @@ describe("presence protocol", () => {
 
   it("rejects malformed, oversized or unknown messages", () => {
     expect(parseClientMessage("not json")).toBeNull();
-    expect(parseClientMessage(JSON.stringify({ t: "chat", text: "hi" }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: "teleport", x: 1 }))).toBeNull();
     expect(parseClientMessage(JSON.stringify({ t: "state", s: { ...state, a: "fly" } }))).toBeNull();
     expect(parseClientMessage(JSON.stringify({ t: "state", s: { ...state, x: "1" } }))).toBeNull();
     expect(parseClientMessage(JSON.stringify({ t: "state", s: { ...state, x: Number.NaN } }))).toBeNull();
     expect(parseClientMessage("x".repeat(600))).toBeNull();
     expect(parseClientMessage(42)).toBeNull();
+  });
+
+  it("accepts chat lines and known reactions, cleaned up", () => {
+    expect(parseClientMessage(JSON.stringify({ t: "chat", text: "  halo   semua \n ya " }))).toEqual({ t: "chat", text: "halo semua ya" });
+    expect(parseClientMessage(JSON.stringify({ t: "chat", text: "   " }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: "chat", text: 42 }))).toBeNull();
+    expect(sanitizeChat("x".repeat(400))).toHaveLength(160);
+    expect(parseClientMessage(JSON.stringify({ t: "react", e: "🎉" }))).toEqual({ t: "react", e: "🎉" });
+    expect(parseClientMessage(JSON.stringify({ t: "react", e: "💩" }))).toBeNull();
   });
 
   it("clamps out-of-range numbers instead of trusting them", () => {

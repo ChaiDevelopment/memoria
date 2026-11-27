@@ -1,14 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
 import { authorize } from "../../src/shared/presenceAuth";
 import {
+  CHAT_HISTORY,
   colorIndexFor,
   chosenName,
   displayName,
   MAX_PEERS,
+  MIN_CHAT_INTERVAL_MS,
   MIN_STATE_INTERVAL_MS,
   parseClientMessage,
   PING_MESSAGE,
   PONG_MESSAGE,
+  type ChatEntry,
   type PeerInfo,
   type PeerState,
   type ServerMessage,
@@ -39,7 +42,13 @@ interface Attachment {
   peer: PeerInfo;
   s: PeerState | null;
   last: number;
+  /** Last chat message / reaction (ms), for rate limiting. */
+  lastChat?: number;
 }
+
+const CHAT_KEY = "chat";
+/** Chat history older than this is not shown to newcomers. */
+const CHAT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -95,7 +104,8 @@ export class MuseumPresence extends DurableObject<Env> {
     server.serializeAttachment({ peer, s: null, last: 0 } satisfies Attachment);
 
     const peers = others.map((ws) => ws.deserializeAttachment() as Attachment | null).filter((a): a is Attachment => !!a).map((a) => ({ ...a.peer, s: a.s }));
-    server.send(JSON.stringify({ t: "welcome", id: peer.id, peers } satisfies ServerMessage));
+    const history = ((await this.ctx.storage.get<ChatEntry[]>(CHAT_KEY)) ?? []).filter((m) => Date.now() - m.at < CHAT_MAX_AGE_MS);
+    server.send(JSON.stringify({ t: "welcome", id: peer.id, peers, chat: history } satisfies ServerMessage));
     this.broadcast({ t: "join", peer }, server);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -106,6 +116,29 @@ export class MuseumPresence extends DurableObject<Env> {
     const att = ws.deserializeAttachment() as Attachment | null;
     if (!att) return;
     const now = Date.now();
+    if (msg.t === "chat" || msg.t === "react") {
+      if (now - (att.lastChat ?? 0) < MIN_CHAT_INTERVAL_MS) return; // rate limit
+      att.lastChat = now;
+      ws.serializeAttachment(att);
+      if (msg.t === "react") {
+        this.broadcast({ t: "react", id: att.peer.id, e: msg.e }, null);
+        return;
+      }
+      const entry: ChatEntry = {
+        id: att.peer.id,
+        name: att.peer.name,
+        text: msg.text,
+        at: now,
+        ...(att.peer.guest ? { guest: true } : {}),
+        ...(att.peer.couple ? { couple: att.peer.couple } : {}),
+      };
+      // Everyone (the sender too) gets the server's cleaned-up copy.
+      this.broadcast({ t: "chat", m: entry }, null);
+      const history = ((await this.ctx.storage.get<ChatEntry[]>(CHAT_KEY)) ?? []).filter((m) => now - m.at < CHAT_MAX_AGE_MS);
+      history.push(entry);
+      await this.ctx.storage.put(CHAT_KEY, history.slice(-CHAT_HISTORY));
+      return;
+    }
     if (now - att.last < MIN_STATE_INTERVAL_MS) return; // rate limit
     att.s = msg.s;
     att.last = now;
@@ -131,7 +164,7 @@ export class MuseumPresence extends DurableObject<Env> {
     }
   }
 
-  private broadcast(msg: ServerMessage, except: WebSocket) {
+  private broadcast(msg: ServerMessage, except: WebSocket | null) {
     const data = JSON.stringify(msg);
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;

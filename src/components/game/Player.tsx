@@ -8,6 +8,7 @@ import { damp } from "@/lib/math";
 import { CharacterAnimator } from "@/systems/animation/characterAnimator";
 import { useGameStore } from "@/stores/gameStore";
 import type { PlayerRuntime } from "@/systems/runtime";
+import { ChatOverhead } from "./ChatOverhead";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
 import type { CharacterModelHandle } from "./character/types";
 
@@ -23,6 +24,8 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
   const groundY = useRef(0);
   /** Rendered feet height: eases over stair steps instead of popping (physics stays exact). */
   const visualY = useRef<number | null>(null);
+  // Your own chat messages float over your head too.
+  const selfId = useGameStore((s) => s.selfId);
   // The couple wear their wedding outfits in their own invitation's venue.
   const outfit = useGameStore((s) => (s.world.kind !== "wedding" ? "explorer" : s.viewer?.role === "bride" ? "gown" : s.viewer?.role === "groom" ? "suit" : "explorer"));
 
@@ -86,6 +89,7 @@ export function Player({ runtime, blobShadow }: { runtime: PlayerRuntime; blobSh
     <>
       <group ref={root} name="player">
         <ProceduralCharacter ref={model} outfit={outfit} />
+        <ChatOverhead peerId={selfId} height={2.1} />
       </group>
       {blobShadow && (
         <mesh ref={blob} material={blobMaterial} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>

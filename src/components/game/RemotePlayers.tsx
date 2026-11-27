@@ -7,6 +7,7 @@ import { SWEATER_COLORS, type PeerInfo } from "@/shared/presence";
 import { useGameStore } from "@/stores/gameStore";
 import { CharacterAnimator } from "@/systems/animation/characterAnimator";
 import { INTERP_DELAY_MS, remotePeers, sampleAt } from "@/systems/presence/remotePeers";
+import { ChatOverhead } from "./ChatOverhead";
 import { ProceduralCharacter } from "./character/ProceduralCharacter";
 import type { CharacterModelHandle } from "./character/types";
 
@@ -53,6 +54,7 @@ function RemoteAvatar({ peer }: { peer: PeerInfo }) {
     <group ref={root} name={`visitor-${peer.name}`} visible={false}>
       <ProceduralCharacter ref={model} sweater={SWEATER_COLORS[peer.color % SWEATER_COLORS.length]} outfit={peer.couple === "bride" ? "gown" : peer.couple === "groom" ? "suit" : "explorer"} />
       <primitive object={tag} position={[0, 2.15, 0]} />
+      <ChatOverhead peerId={peer.id} height={2.33} />
     </group>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type RefObject } from "react";
-import { gameStore } from "@/stores/gameStore";
+import { gameStore, isGameplayBlocked } from "@/stores/gameStore";
 import { addLook, input, resetInput } from "@/systems/input/inputState";
 import { isPointerLocked, requestPointerLock, setPointerLockTarget } from "@/systems/input/pointerLock";
 
@@ -49,6 +49,14 @@ export function useDesktopControls(surface: RefObject<HTMLElement | null>) {
         return;
       }
       switch (e.code) {
+        case "Enter":
+        case "NumpadEnter":
+          // Enter opens the chat (when multiplayer is on and nothing else is open).
+          if (!e.repeat && st.phase === "playing" && st.presence === "online" && !isGameplayBlocked(st)) {
+            e.preventDefault();
+            st.openChat();
+          }
+          break;
         case "Space":
           e.preventDefault();
           if (!e.repeat) input.jumpQueued = true;
@@ -114,7 +122,7 @@ export function useDesktopControls(surface: RefObject<HTMLElement | null>) {
       resetInput();
       if (st.inspectingId) st.closeInspect();
       // The lift menu releases the mouse on purpose (to click a floor).
-      else if (st.phase === "playing" && !st.menuOpen && !st.liftMenuOpen && st.albumIndex === null && !st.guestbookOpen && !st.panel && !st.isTouch) st.openMenu();
+      else if (st.phase === "playing" && !st.menuOpen && !st.liftMenuOpen && st.albumIndex === null && !st.guestbookOpen && !st.panel && !st.chatOpen && !st.isTouch) st.openMenu();
     };
 
     window.addEventListener("keydown", onKeyDown);

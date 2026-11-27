@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { api, ApiClientError } from "@/lib/apiClient";
 import { PING_MESSAGE, parseServerMessage, stateChanged, type PeerState } from "@/shared/presence";
 import { gameStore, useGameStore } from "@/stores/gameStore";
-import { getLocalRuntime, pushState, remotePeers, upsertPeer } from "@/systems/presence/remotePeers";
+import { getLocalRuntime, pushState, remotePeers, setPresenceSender, upsertPeer } from "@/systems/presence/remotePeers";
 
 const SEND_INTERVAL_MS = 200; // ≤ 5 updates/s, and only when something changed
 const PING_INTERVAL_MS = 25_000;
@@ -38,6 +38,8 @@ export function usePresence() {
     };
 
     const cleanup = () => {
+      setPresenceSender(null);
+      gameStore.getState().setSelfId(null);
       clearInterval(sendTimer);
       clearInterval(pingTimer);
       remotePeers.clear();
@@ -77,6 +79,11 @@ export function usePresence() {
 
       ws.onopen = () => {
         retry = 0;
+        setPresenceSender((msg) => {
+          if (ws.readyState !== WebSocket.OPEN) return false;
+          ws.send(JSON.stringify(msg));
+          return true;
+        });
         sendTimer = setInterval(() => {
           if (ws.readyState !== WebSocket.OPEN || document.hidden) return;
           const s = currentState();
@@ -92,6 +99,8 @@ export function usePresence() {
         if (!msg) return;
         switch (msg.t) {
           case "welcome":
+            gameStore.getState().setSelfId(msg.id);
+            gameStore.getState().addChat(msg.chat ?? [], true);
             remotePeers.clear();
             for (const p of msg.peers) upsertPeer({ id: p.id, name: p.name, color: p.color, ...(p.guest ? { guest: true } : {}), ...(p.couple ? { couple: p.couple } : {}) }, p.s);
             lastSent = null; // announce our position to everyone right away
@@ -108,6 +117,12 @@ export function usePresence() {
             break;
           case "state":
             pushState(msg.id, msg.s);
+            break;
+          case "chat":
+            gameStore.getState().addChat([msg.m]);
+            break;
+          case "react":
+            gameStore.getState().addReaction(msg.id, msg.e);
             break;
           case "full":
             stopped = true;

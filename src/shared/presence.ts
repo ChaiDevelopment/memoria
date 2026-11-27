@@ -44,14 +44,49 @@ export interface PeerInfo {
   color: number;
 }
 
-export type ClientMessage = { t: "state"; s: PeerState };
+/** Quick reactions: an emoji floats up over the sender's head. */
+export const REACTIONS = ["👏", "❤️", "🎉", "😂", "🙏", "😍"] as const;
+export type Reaction = (typeof REACTIONS)[number];
+export const MAX_CHAT_LENGTH = 160;
+/** Messages a newcomer sees when they arrive (the room keeps the latest few). */
+export const CHAT_HISTORY = 30;
+/** Minimum time between chat messages / reactions from one visitor (ms). */
+export const MIN_CHAT_INTERVAL_MS = 900;
+
+/** One chat message as everyone in the room sees it. */
+export interface ChatEntry {
+  /** Sender's peer id (for their speech bubble). */
+  id: string;
+  name: string;
+  text: string;
+  /** Server time (ms). */
+  at: number;
+  guest?: boolean;
+  couple?: "bride" | "groom";
+}
+
+export type ClientMessage = { t: "state"; s: PeerState } | { t: "chat"; text: string } | { t: "react"; e: Reaction };
 
 export type ServerMessage =
-  | { t: "welcome"; id: string; peers: (PeerInfo & { s: PeerState | null })[] }
+  | { t: "welcome"; id: string; peers: (PeerInfo & { s: PeerState | null })[]; chat?: ChatEntry[] }
   | { t: "join"; peer: PeerInfo }
   | { t: "leave"; id: string }
   | { t: "state"; id: string; s: PeerState }
+  | { t: "chat"; m: ChatEntry }
+  | { t: "react"; id: string; e: Reaction }
   | { t: "full" };
+
+/** A chat message from an untrusted client: one line, no control characters, at most 160 characters. */
+export function sanitizeChat(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const clean = raw
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return null;
+  return [...clean].slice(0, MAX_CHAT_LENGTH).join("").trim();
+}
 
 /** Claims inside the short-lived token issued by /api/presence/token. */
 export interface PresenceTokenClaims {
@@ -119,8 +154,15 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   } catch {
     return null;
   }
-  if (!data || typeof data !== "object" || (data as { t?: unknown }).t !== "state") return null;
-  const s = sanitizeState((data as { s?: unknown }).s);
+  if (!data || typeof data !== "object") return null;
+  const d = data as { t?: unknown; s?: unknown; text?: unknown; e?: unknown };
+  if (d.t === "chat") {
+    const text = sanitizeChat(d.text);
+    return text ? { t: "chat", text } : null;
+  }
+  if (d.t === "react") return typeof d.e === "string" && (REACTIONS as readonly string[]).includes(d.e) ? { t: "react", e: d.e as Reaction } : null;
+  if (d.t !== "state") return null;
+  const s = sanitizeState(d.s);
   return s ? { t: "state", s } : null;
 }
 
